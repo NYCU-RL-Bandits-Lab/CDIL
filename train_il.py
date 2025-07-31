@@ -11,17 +11,21 @@ import wrappers
 import math
 import agent.demodice as demodice
 import agent.avatar_dice as avatar_dice
+import agent.smodice as smodice
 import utils.utils as utils
 import time
 import pickle
 from torch.utils.tensorboard import SummaryWriter
 import ast
+from utils.discriminator import Discriminator_SA
+
 
 def seed_torch(seed):
     torch.manual_seed(seed)
     if torch.backends.cudnn.enabled:
         torch.backends.cudnn.benchmark = False
         torch.backends.cudnn.deterministic = True
+
 
 def evaluate_d4rl(config, env_id, actor, shift_env, scale_env, num_seed=5, num_episodes=10):
     """Evaluates the policy.
@@ -62,10 +66,15 @@ def evaluate_d4rl(config, env_id, actor, shift_env, scale_env, num_seed=5, num_e
                         state = np.concatenate((state[:27], [0.]), -1)
                     else:
                         state = np.concatenate((state[:31], [0.]), -1)
-                action = actor.step(state)[0].numpy()
+
+                if config['algorithm'] == 'smodice':
+                    actions = actor.step((np.array([state])).astype(np.float32))
+                    action = actions[0][0].numpy()
+                else:
+                    action = actor.step(state)[0].numpy()
+
                 if env_is_gym:
                     next_state, reward, done, _ = eval_env.step(action)
-                    
                 else:
                     next_state, reward, done, _, _ = eval_env.step(action)
 
@@ -102,6 +111,7 @@ def run(config):
 
     writer = SummaryWriter(tb_path)
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # expert data info
     expert_dataset_name = config['expert_dataset_name']
     expert_num_traj = config['expert_num_traj']
@@ -273,6 +283,46 @@ def run(config):
             src_obs_dim,
             src_env.action_space.shape[0],
             config=config)
+    elif algorithm == 'smodice':
+        # load src trajectory
+        # src_imperfect_init_states, src_imperfect_states, src_imperfect_actions, src_imperfect_next_states, src_imperfect_dones = [], [], [], [], []
+        if xml_path:
+            (src_expert_initial_states, src_expert_states, src_expert_actions, src_expert_next_states, src_expert_dones) = utils.load_d4rl_data(
+                dataset_dir, env_id+'-v2', expert_dataset_name, 400, start_idx=0)
+        else:
+            # src_dataset_file_names = config['src_dataset_file_names']
+            src_dataset_path = os.path.join(dataset_dir, config['src_expert_path'])
+            (src_expert_initial_states, src_expert_states, src_expert_actions, src_expert_next_states, src_expert_dones) = utils.sample_demonstrations(
+                env_id=env_id, num_trajectories=400, load_path=src_dataset_path, max_episode_steps=500, difficulty='expert', dtype=np.float32, env_robot=config['src_env_robot'])
+
+        # normalize expert dataset
+        disc_cutoff = observation_dim - 1
+        if src_expert_states.shape[1] < disc_cutoff:
+            # Pad with zeros to reach disc_cutoff
+            padding = np.zeros((src_expert_states.shape[0], 
+                    disc_cutoff - src_expert_states.shape[1]))
+            src_expert_states = np.concatenate([src_expert_states, padding], axis=1)
+        elif src_expert_states.shape[1] > disc_cutoff:
+            # Truncate to disc_cutoff
+            src_expert_states = src_expert_states[:, :disc_cutoff]
+        src_expert_states = (src_expert_states + shift[:disc_cutoff]) * scale[:disc_cutoff]
+        src_expert_states = np.c_[src_expert_states, np.zeros(len(src_expert_states), dtype=np.float32)]
+        disc_cutoff += 1
+
+        discriminator = Discriminator_SA(disc_cutoff, 0, hidden_dim=config['hidden_size'], device=device)
+        dataset_expert = torch.utils.data.TensorDataset(torch.FloatTensor(src_expert_states))    
+        expert_loader = torch.utils.data.DataLoader(dataset_expert, batch_size=256, shuffle=True, pin_memory=True, drop_last=True)
+        dataset_offline = torch.utils.data.TensorDataset(torch.FloatTensor(union_states))
+        offline_loader = torch.utils.data.DataLoader(dataset_offline, batch_size=256, shuffle=True, pin_memory=True, drop_last=True)
+        for i in tqdm(range(config['disc_iterations'])):
+            loss = discriminator.update(expert_loader, offline_loader)
+
+        imitator = smodice.SMODICE(
+            observation_spec=observation_dim,
+            action_spec=action_dim,
+            config=config
+        )
+        
     else:
         raise ValueError(f'{algorithm} is not supported algorithm name')
 
@@ -300,7 +350,6 @@ def run(config):
     total_iterations = config['total_iterations']
 
     # make data tensor
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     union_init_states = torch.from_numpy(union_init_states).float().to(device)
     expert_states = torch.from_numpy(expert_states).float().to(device)
     expert_actions = torch.from_numpy(expert_actions).float().to(device)
@@ -308,6 +357,7 @@ def run(config):
     union_states = torch.from_numpy(union_states).float().to(device)
     union_actions = torch.from_numpy(union_actions).float().to(device)
     union_next_states = torch.from_numpy(union_next_states).float().to(device)
+    union_dones = torch.from_numpy(union_dones).float().to(device)
 
     # Start training
     start_time = time.time()
@@ -341,6 +391,24 @@ def run(config):
                     training_info['iteration'],
                     config['power_decay_weight']
                 )
+            elif algorithm == 'smodice':
+                # Get rewards
+                with torch.no_grad():
+                    obs_for_disc = torch.from_numpy(np.array(union_states[union_indices].cpu())).to(discriminator.device)
+                    if config['state']:
+                        disc_input = obs_for_disc
+                    else:
+                        act_for_disc = torch.from_numpy(np.array(union_actions[union_indices].cpu())).to(discriminator.device)
+                        disc_input = torch.cat([obs_for_disc, act_for_disc], axis=1)
+                    reward = discriminator.predict_reward(disc_input)
+
+                info_dict = imitator.train_step(union_init_states[union_init_indices],
+                                                    union_states[union_indices], 
+                                                    union_actions[union_indices], 
+                                                    reward, 
+                                                    union_next_states[union_indices],
+                                                    union_dones[union_indices])
+
             else:
                 raise ValueError(f'Undefined algorithm {algorithm}')
 
@@ -354,7 +422,10 @@ def run(config):
                       f' / elapsed_time={time.time() - start_time} ({training_info["iteration"] / (time.time() - start_time)} it/sec)')
                 print('=========================')
                 for key, val in info_dict.items():
-                    print(f'{key:25}: {val:8.3f}')
+                    if algorithm == 'smodice':
+                        print(f'{key:25}: {val.item():8.3f}')
+                    else:
+                        print(f'{key:25}: {val:8.3f}')
                 print('=========================')
 
                 training_info['logs'].append({'step': training_info['iteration'], 'log': info_dict})
@@ -367,9 +438,10 @@ def run(config):
                 writer.add_scalar('Time weight decay', imitator.c2_smooth**config['power_decay_weight'] / (imitator.c1**config['power_decay_weight'] + imitator.c2_smooth**config['power_decay_weight'] + 1e-6), training_info['iteration'])
 
             # Save checkpoint
-            if training_info['iteration'] % config['save_interval'] == 0:
-                checkpoint_filepath = f"{checkpoint_dir}/{training_info['iteration']}.pickle"
-                imitator.save(checkpoint_filepath, training_info)
+            if (algorithm == 'demodice') and (algorithm == 'avatar_dice'):
+                if training_info['iteration'] % config['save_interval'] == 0:
+                    checkpoint_filepath = f"{checkpoint_dir}/{training_info['iteration']}.pickle"
+                    imitator.save(checkpoint_filepath, training_info)
 
             training_info['iteration'] += 1
             pbar.update(1)

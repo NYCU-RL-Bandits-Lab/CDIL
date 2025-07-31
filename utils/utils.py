@@ -26,6 +26,18 @@ EPS = np.finfo(np.float32).eps
 KEYS = ['observations', 'actions', 'rewards', 'terminals']
 
 
+# Inverse tanh torch function
+def atanh(z):
+    return 0.5 * (torch.log(1 + z) - torch.log(1 - z))
+
+
+# Initialize Policy weights
+def weights_init_(m):
+    if isinstance(m, nn.Linear):
+        torch.nn.init.xavier_uniform_(m.weight, gain=1)
+        torch.nn.init.constant_(m.bias, 0)
+
+
 class TanhActor(nn.Module):
     def __init__(self, state_dim, action_dim, hidden_size=256, mean_range=(-7., 7.), logstd_range=(-5., 2.), initial_std_scaler=1):
         super(TanhActor, self).__init__()
@@ -108,7 +120,6 @@ class DiscreteActor(nn.Module):
         return log_probs
 
 
-
 class Critic(nn.Module):
     def __init__(self, state_dim, action_dim, hidden_size=256, output_activation_fn=None, use_last_layer_bias=False, output_dim=None):
         super(Critic, self).__init__()
@@ -155,6 +166,7 @@ class action_decoder_network(nn.Module):
         source_action = self.model(target_action.float()) * 0.5
         return source_action
 
+
 class decoder_network(nn.Module):
     def __init__(self, source_state_dim, target_state_dim, hidden_size, device):
         super(decoder_network, self).__init__()
@@ -173,6 +185,97 @@ class decoder_network(nn.Module):
         source_state = self.model(target_state.float()) * 0.5
         return source_state
 
+
+class TanhNormalPolicy(nn.Module):
+
+    def __init__(self, num_inputs, num_actions, hidden_sizes=(256,256), action_space=None,
+                 mean_range=(-7.24, 7.24), logstd_range=(-5., 2.), eps=1e-6):
+        super(TanhNormalPolicy, self).__init__()
+        
+        self.linear1 = nn.Linear(num_inputs, hidden_sizes[0])
+        self.linear2 = nn.Linear(hidden_sizes[0], hidden_sizes[1])
+
+        self.mean_linear = nn.Linear(hidden_sizes[1], num_actions)
+        self.log_std_linear = nn.Linear(hidden_sizes[1], num_actions)
+
+        self.apply(weights_init_)
+
+        # action rescaling
+        if action_space is None:
+            self.action_scale = torch.tensor(1.)
+            self.action_bias = torch.tensor(0.)
+        else:
+            self.action_scale = torch.FloatTensor(
+                (action_space.high - action_space.low) / 2.)
+            self.action_bias = torch.FloatTensor(
+                (action_space.high + action_space.low) / 2.)
+        
+        self.mean_min, self.mean_max = mean_range
+        self.logstd_min, self.logstd_max = logstd_range
+        self.eps = eps
+
+    def forward(self, inputs, step_type=(), network_state=(), training=False):
+        inputs = torch.cat(inputs, 1)
+        x = F.relu(self.linear1(inputs))
+        x = F.relu(self.linear2(x))
+
+        mean = self.mean_linear(x)
+        mean = torch.clamp(mean, self.mean_min, self.mean_max)
+        logstd = self.log_std_linear(x)
+        logstd = torch.clamp(logstd, self.logstd_min, self.logstd_max)
+        std = torch.exp(logstd)
+        pretanh_action_dist = distributions.Normal(mean, std)
+        pretanh_action = pretanh_action_dist.rsample()
+        action = torch.tanh(pretanh_action)
+        log_prob, pretanh_log_prob = self.log_prob(pretanh_action_dist, pretanh_action, is_pretanh_action=True)
+
+        return (action, pretanh_action, log_prob, pretanh_log_prob, pretanh_action_dist), network_state
+
+    def log_prob(self, pretanh_action_dist, action, is_pretanh_action=True):
+        if is_pretanh_action:
+            pretanh_action = action
+            action = torch.tanh(pretanh_action)
+        else:
+            pretanh_action = atanh(torch.clamp(action, -1 + self.eps, 1 - self.eps))
+
+        pretanh_log_prob = pretanh_action_dist.log_prob(pretanh_action)
+        log_prob = pretanh_log_prob - torch.log(1 - action ** 2 + self.eps)
+        log_prob = log_prob.sum(1, keepdim=True)
+        return log_prob, pretanh_log_prob
+
+    def deterministic_action(self, inputs):
+        x = F.relu(self.linear1(inputs))
+        x = F.relu(self.linear2(x))
+
+        mean = self.mean_linear(x)
+        mean = torch.clamp(mean, self.mean_min, self.mean_max)
+        action = torch.tanh(mean)
+        return action
+
+    def to(self, device):
+        self.action_scale = self.action_scale.to(device)
+        self.action_bias = self.action_bias.to(device)
+        return super(TanhNormalPolicy, self).to(device)
+    
+
+class ValueNetwork(nn.Module):
+    def __init__(self, num_inputs, hidden_sizes):
+        super(ValueNetwork, self).__init__()
+
+        self.linear1 = nn.Linear(num_inputs, hidden_sizes[0])
+        self.linear2 = nn.Linear(hidden_sizes[0], hidden_sizes[1])
+        self.linear3 = nn.Linear(hidden_sizes[1], 1)
+
+        self.apply(weights_init_)
+
+    def forward(self, state):
+        state = torch.cat(state, 1)
+        x = F.relu(self.linear1(state))
+        x = F.relu(self.linear2(x))
+        x = self.linear3(x)
+        return x, None
+    
+    
 def load_d4rl_data(dirname, env_id, dataname, num_trajectories, start_idx=0, dtype=np.float32):
     MAX_EPISODE_STEPS = 200 #hammer, relocate: 200
 
@@ -276,6 +379,7 @@ def load_d4rl_data(dirname, env_id, dataname, num_trajectories, start_idx=0, dty
     print(f'{num_trajectories} trajectories are sampled, average reward: {avg_reward}, average length: {avg_len}')
     return np.array(init_obs_, dtype=dtype), np.array(obs_, dtype=dtype), np.array(action_, dtype=dtype), np.array(
         next_obs_, dtype=dtype), np.array(done_)
+
 
 def sample_demonstrations(env_id, xml_path=None, num_trajectories=1, load_path=None, max_episode_steps=1000, difficulty='random', pair_num = 0, dtype=np.float32, env_robot=None):
     # for saved file for datasets
