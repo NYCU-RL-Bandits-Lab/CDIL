@@ -1,4 +1,5 @@
 import argparse
+import ast
 ENV_ID = [
     'Hopper',
     'HalfCheetah',
@@ -37,8 +38,9 @@ def get_parser():
     parser.add_argument('--load_hdf5_dataset', default=1, type=int)
     parser.add_argument('--expert_num_traj', default=1, type=int)
     parser.add_argument('--imperfect_dataset_names', default=[], action='append')
-    parser.add_argument('--imperfect_num_trajs', default=[], action='append', type=int)
-    parser.add_argument('--imperfect_dataset_default_info', default=(["expert-v2", "random-v2"], [1, 100])) # source: [400, 1600] , target: [50, 200]\[10, 100], default=(["expert-v2", "random-v2"], [1, 100]), default=(["expert-v1", "cloned-v1"], [400, 1600])
+    parser.add_argument('--imperfect_num_trajs', default=[], nargs='*', type=int)
+    # parser.add_argument('--imperfect_dataset_default_info', default=(["expert-v2", "random-v2"], [50, 500])) # source: [400, 1600] , target: [50, 200]\[10, 100], default=(["expert-v2", "random-v2"], [1, 100]), default=(["expert-v1", "cloned-v1"], [400, 1600])
+    parser.add_argument('--imperfect_dataset_default_info', type=ast.literal_eval, default=(["expert-v2", "random-v2"], [50, 500])) # source: [400, 1600] , target: [50, 200]\[10, 100], default=(["expert-v2", "random-v2"], [1, 100]), default=(["expert-v1", "cloned-v1"], [400, 1600])
     parser.add_argument('--resume', default=False, type=bool)
     parser.add_argument('--tb_path', default=None, type=str)
     # avatar DICE
@@ -79,7 +81,7 @@ def get_parser():
     parser.add_argument('--save_interval', default=int(1e4), type=int)
     parser.add_argument('--log_interval', default=int(1e4), type=int)
     parser.add_argument('--critic_lr', default=3e-4, type=float)
-    parser.add_argument('--actor_lr', default=3e-4, type=float)
+    parser.add_argument('--actor_lr', default=1e-4, type=float)
     parser.add_argument('--gamma', default=0.99, type=float)
     parser.add_argument('--alpha', default=0.0, type=float)
     parser.add_argument('--hidden_size', default=256, type=int)
@@ -89,5 +91,5 @@ def get_parser():
     parser.add_argument('--use_last_layer_bias_cost', default=False, type=bool)
     parser.add_argument('--use_last_layer_bias_critic', default=False, type=bool)
     parser.add_argument('--kernel_initializer', default='he_normal', type=str)
-    parser.add_argument('--seed', default=1, type=int)
+    parser.add_argument('--seed', default=0, type=int)
     return parser

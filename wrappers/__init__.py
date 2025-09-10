@@ -24,6 +24,52 @@ from robosuite import load_controller_config
 from robosuite.wrappers import GymWrapper
 
 
+class GymToGymnasium(gymnasium.Env):
+    def __init__(self, env):
+        self.env = env
+        self.action_space = env.action_space
+        self.observation_space = env.observation_space
+        self.reward_range = getattr(
+            env, "reward_range", (-float("inf"), float("inf")))
+        self.metadata = getattr(env, "metadata", {})
+        self.render_mode = getattr(env, "render_mode", None)
+
+    def reset(self, seed=None, options=None):
+        # Try new API first, fall back to old gym API
+        try:
+            obs, info = self.env.reset(
+                seed=seed, return_info=True)  # gym>=0.26
+            return obs, (info if isinstance(info, dict) else {})
+        except TypeError:
+            if seed is not None:
+                try:
+                    self.env.reset(seed=seed)
+                except TypeError:
+                    if hasattr(self.env, "seed"):
+                        self.env.seed(seed)
+            obs, _ = self.env.reset()
+            return obs, {}
+
+    def step(self, action):
+        out = self.env.step(action)
+        if len(out) == 5:
+            return out  # already gymnasium style
+        obs, reward, done, info = out
+        terminated = bool(done)
+        truncated = False
+        return obs, reward, terminated, truncated, info
+
+    def render(self):
+        return self.env.render()
+
+    def close(self):
+        return self.env.close()
+
+    @property
+    def spec(self):
+        return getattr(self.env, "spec", None)
+
+
 def create_il_env(env_name, shift, scale, normalized_box_actions: bool = True, xml_path=None, robot=None):
     """Create a gym environment for imitation learning.
     Args:

@@ -165,10 +165,10 @@ def run(config, cfg):
             index = 0
             load_paths = dataset_file_names[-2:]
             for i in range(len(load_paths)):
-                if load_paths[i] == None:
-                    load_paths[i] = None
-                else:
+                if load_paths[i] is not None:
                     load_paths[i] = os.path.join(dataset_dir, load_paths[i])
+                else:
+                    load_paths[i] = None
 
         for imperfect_datatype_idx, (imperfect_dataset_name, imperfect_num_traj) in enumerate(
                 zip(imperfect_dataset_names, imperfect_num_trajs)):
@@ -435,9 +435,9 @@ def run(config, cfg):
     with tqdm(total=total_iterations+1, initial=training_info['iteration'], desc='',
               disable=os.environ.get("DISABLE_TQDM", False), ncols=70) as pbar:
         while training_info['iteration'] <= total_iterations:
-            union_init_indices = np.random.randint(0, len(union_init_states_), size=batch_size)
-            expert_indices = np.random.randint(0, len(expert_states_), size=batch_size)
-            union_indices = np.random.randint(0, len(union_states_), size=batch_size)
+            union_init_indices = np.random.randint(0, len(union_init_states), size=batch_size)
+            expert_indices = np.random.randint(0, len(expert_states), size=batch_size)
+            union_indices = np.random.randint(0, len(union_states), size=batch_size)
             if algorithm == 'demodice':
                 info_dict = imitator.update(
                     union_init_states_[union_init_indices],
