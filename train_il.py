@@ -5,20 +5,27 @@ import os
 import random
 import numpy as np
 np.bool = np.bool_
+import hydra
 import torch
 from tqdm import tqdm
+from tqdm import trange
 import wrappers
 import math
 import agent.demodice as demodice
 import agent.avatar_dice as avatar_dice
 import agent.smodice as smodice
+import agent.gwil as gwil
+import agent.igdf as igdf
 import utils.utils as utils
+from utils.replay_buffer import ReplayBuffer
+from utils.sac import SAC
 import time
 import pickle
 from torch.utils.tensorboard import SummaryWriter
 import ast
 from utils.discriminator import Discriminator_SA
-
+from utils.contrastiveoi import ContrastiveInfo
+from omegaconf import DictConfig, OmegaConf
 
 def seed_torch(seed):
     torch.manual_seed(seed)
@@ -26,6 +33,10 @@ def seed_torch(seed):
         torch.backends.cudnn.benchmark = False
         torch.backends.cudnn.deterministic = True
 
+def get_args(cfg: DictConfig):
+    cfg.device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    cfg.hydra_base_dir = os.getcwd()
+    return cfg
 
 def evaluate_d4rl(config, env_id, actor, shift_env, scale_env, num_seed=5, num_episodes=10):
     """Evaluates the policy.
@@ -70,6 +81,12 @@ def evaluate_d4rl(config, env_id, actor, shift_env, scale_env, num_seed=5, num_e
                 if config['algorithm'] == 'smodice':
                     actions = actor.step((np.array([state])).astype(np.float32))
                     action = actions[0][0].numpy()
+                elif config['algorithm'] == 'gwil':
+                    with utils.eval_mode(actor):
+                        action = actor.act(state, sample=False)
+                elif config['algorithm'] == 'igdf':
+                    with utils.eval_mode(actor):
+                        action = actor.choose_action(state, sample=False)
                 else:
                     action = actor.step(state)[0].numpy()
 
@@ -92,8 +109,9 @@ def evaluate_d4rl(config, env_id, actor, shift_env, scale_env, num_seed=5, num_e
 
     return mean_score, mean_timesteps
 
+def run(config, cfg):
+    sac_args = get_args(cfg)
 
-def run(config):
     seed = config['seed']
     seed_torch(seed)
     np.random.seed(seed)
@@ -119,13 +137,14 @@ def run(config):
     imperfect_dataset_names = config['imperfect_dataset_names']
     imperfect_num_trajs = config['imperfect_num_trajs']
     if len(imperfect_dataset_names) == 0:
-        imperfect_dataset_names, imperfect_num_trajs = config['imperfect_dataset_default_info']
+        imperfect_dataset_names, imperfect_num_trajs = info = ast.literal_eval(config['imperfect_dataset_default_info'])
     assert len(imperfect_dataset_names) == len(imperfect_num_trajs)
 
     dataset_dir = config['dataset_dir']
     if not load_hdf5_dataset:
         dataset_path = os.path.join(dataset_dir, dataset_file_names[0])
-    
+    traj_nums = []
+    traj_lens = []
     if load_hdf5_dataset:
         (expert_initial_states, expert_states, expert_actions, expert_next_states, expert_dones) = utils.load_d4rl_data(
             dataset_dir, env_id+'-v2', expert_dataset_name, expert_num_traj, start_idx=0)
@@ -135,7 +154,10 @@ def run(config):
     elif env_robot:
         (expert_initial_states, expert_states, expert_actions, expert_next_states, expert_dones) = utils.sample_demonstrations(
         env_id=env_id, num_trajectories=expert_num_traj, load_path=dataset_path, max_episode_steps=500, difficulty='expert', dtype=np.float32, env_robot=env_robot) 
-    
+
+    traj_nums.append(expert_num_traj)
+    traj_lens.append(math.ceil(expert_states.shape[0]/expert_num_traj))
+
     # load non-expert dataset
     imperfect_init_states, imperfect_states, imperfect_actions, imperfect_next_states, imperfect_dones = [], [], [], [], []
     if len(imperfect_dataset_names) > 0:
@@ -143,7 +165,10 @@ def run(config):
             index = 0
             load_paths = dataset_file_names[-2:]
             for i in range(len(load_paths)):
-                load_paths[i] = os.path.join(dataset_dir, load_paths[i])
+                if load_paths[i] == None:
+                    load_paths[i] = None
+                else:
+                    load_paths[i] = os.path.join(dataset_dir, load_paths[i])
 
         for imperfect_datatype_idx, (imperfect_dataset_name, imperfect_num_traj) in enumerate(
                 zip(imperfect_dataset_names, imperfect_num_trajs)):
@@ -178,6 +203,10 @@ def run(config):
             imperfect_next_states.append(next_states)
             imperfect_dones.append(dones)
 
+            traj_nums.append(imperfect_num_traj)
+            traj_lens.append(math.ceil(states.shape[0]/imperfect_num_traj))
+
+
     imperfect_init_states = np.concatenate(imperfect_init_states).astype(np.float32)
     imperfect_states = np.concatenate(imperfect_states).astype(np.float32)
     imperfect_actions = np.concatenate(imperfect_actions).astype(np.float32)
@@ -192,7 +221,6 @@ def run(config):
 
     print('# of expert demonstraions: {}'.format(expert_states.shape[0]))
     print('# of imperfect demonstraions: {}'.format(imperfect_states.shape[0]))
-
     # normalize
     shift = -np.mean(imperfect_states, 0)
     scale = 1.0 / (np.std(imperfect_states, 0) + 1e-3)
@@ -285,12 +313,10 @@ def run(config):
             config=config)
     elif algorithm == 'smodice':
         # load src trajectory
-        # src_imperfect_init_states, src_imperfect_states, src_imperfect_actions, src_imperfect_next_states, src_imperfect_dones = [], [], [], [], []
         if xml_path:
             (src_expert_initial_states, src_expert_states, src_expert_actions, src_expert_next_states, src_expert_dones) = utils.load_d4rl_data(
                 dataset_dir, env_id+'-v2', expert_dataset_name, 400, start_idx=0)
         else:
-            # src_dataset_file_names = config['src_dataset_file_names']
             src_dataset_path = os.path.join(dataset_dir, config['src_expert_path'])
             (src_expert_initial_states, src_expert_states, src_expert_actions, src_expert_next_states, src_expert_dones) = utils.sample_demonstrations(
                 env_id=env_id, num_trajectories=400, load_path=src_dataset_path, max_episode_steps=500, difficulty='expert', dtype=np.float32, env_robot=config['src_env_robot'])
@@ -322,7 +348,46 @@ def run(config):
             action_spec=action_dim,
             config=config
         )
-        
+    elif algorithm == 'gwil':
+        if xml_path:
+            (src_expert_initial_states, src_expert_states, src_expert_actions, src_expert_next_states, src_expert_dones) = utils.load_d4rl_data(
+                dataset_dir, env_id+'-v2', expert_dataset_name, 400, start_idx=0)
+        else:
+            src_dataset_path = os.path.join(dataset_dir, config['src_expert_path'])
+            (src_expert_initial_states, src_expert_states, src_expert_actions, src_expert_next_states, src_expert_dones) = utils.sample_demonstrations(
+                env_id=env_id, num_trajectories=400, load_path=src_dataset_path, max_episode_steps=500, difficulty='expert', dtype=np.float32, env_robot=config['src_env_robot'])
+        traj_expert = np.concatenate((src_expert_states, src_expert_actions), axis=1)
+        src_expert_traj_len = math.ceil(src_expert_states.shape[0] / 400)
+        imitator = gwil.GWIL(
+            obs_dim=observation_dim,
+            action_dim=action_dim,
+            action_range=[
+                float(env.action_space.low.min()),
+                float(env.action_space.high.max())
+            ],
+            config=config
+        )
+        replay_buffer = ReplayBuffer(observation_dim,
+                                          action_dim,
+                                          int(config['replay_buffer_capacity']),
+                                          device, config)
+    elif algorithm == 'igdf':
+        target_buffer, target_expert_buffer, source_buffer, source_expert_buffer, info = igdf.load_data_and_train_contras(
+            env_id, dataset_dir, config, observation_dim, action_dim, 
+            union_states, union_actions, union_next_states, union_dones,
+            expert_states, expert_actions, expert_next_states, expert_dones
+        )
+
+        action_range = [
+            float(env.action_space.low.min()),
+            float(env.action_space.high.max())
+        ]
+        sac_args.agent.obs_dim = observation_dim
+        sac_args.agent.action_dim = action_dim
+        imitator = SAC(observation_dim, action_dim, action_range, 256, sac_args, config)
+
+        trainer = igdf.IQ_Learn(imitator)
+
     else:
         raise ValueError(f'{algorithm} is not supported algorithm name')
 
@@ -347,46 +412,52 @@ def run(config):
             'logs': [],
         }
     print(config['save_interval'])
-    total_iterations = config['total_iterations']
+    total_iterations = config['total_iterations'] + 1
 
     # make data tensor
-    union_init_states = torch.from_numpy(union_init_states).float().to(device)
-    expert_states = torch.from_numpy(expert_states).float().to(device)
-    expert_actions = torch.from_numpy(expert_actions).float().to(device)
-    expert_next_states = torch.from_numpy(expert_next_states).float().to(device)
-    union_states = torch.from_numpy(union_states).float().to(device)
-    union_actions = torch.from_numpy(union_actions).float().to(device)
-    union_next_states = torch.from_numpy(union_next_states).float().to(device)
-    union_dones = torch.from_numpy(union_dones).float().to(device)
+    union_init_states_ = torch.from_numpy(union_init_states).float().to(device)
+    expert_states_ = torch.from_numpy(expert_states).float().to(device)
+    expert_actions_ = torch.from_numpy(expert_actions).float().to(device)
+    expert_next_states_ = torch.from_numpy(expert_next_states).float().to(device)
+    union_states_ = torch.from_numpy(union_states).float().to(device)
+    union_actions_ = torch.from_numpy(union_actions).float().to(device)
+    union_next_states_ = torch.from_numpy(union_next_states).float().to(device)
+    union_dones_ = torch.from_numpy(union_dones).float().to(device)
 
     # Start training
     start_time = time.time()
+    traj_num_idx = 0
+    traj_len_idx = 0
+    traj_idx = 0
+    traj_count = 0
+    traj_base_num = 0
+    info_dict = {}
     with tqdm(total=total_iterations+1, initial=training_info['iteration'], desc='',
               disable=os.environ.get("DISABLE_TQDM", False), ncols=70) as pbar:
-        while training_info['iteration'] < total_iterations:
-            union_init_indices = np.random.randint(0, len(union_init_states), size=batch_size)
-            expert_indices = np.random.randint(0, len(expert_states), size=batch_size)
-            union_indices = np.random.randint(0, len(union_states), size=batch_size)
+        while training_info['iteration'] <= total_iterations:
+            union_init_indices = np.random.randint(0, len(union_init_states_), size=batch_size)
+            expert_indices = np.random.randint(0, len(expert_states_), size=batch_size)
+            union_indices = np.random.randint(0, len(union_states_), size=batch_size)
             if algorithm == 'demodice':
                 info_dict = imitator.update(
-                    union_init_states[union_init_indices],
-                    expert_states[expert_indices],
-                    expert_actions[expert_indices],
-                    expert_next_states[expert_indices],
-                    union_states[union_indices],
-                    union_actions[union_indices],
-                    union_next_states[union_indices],
+                    union_init_states_[union_init_indices],
+                    expert_states_[expert_indices],
+                    expert_actions_[expert_indices],
+                    expert_next_states_[expert_indices],
+                    union_states_[union_indices],
+                    union_actions_[union_indices],
+                    union_next_states_[union_indices],
                     training_info['iteration'],
                 )
             elif algorithm == 'avatar_dice':
                 info_dict = imitator.update(
-                    union_init_states[union_init_indices],
-                    expert_states[expert_indices],
-                    expert_actions[expert_indices],
-                    expert_next_states[expert_indices],
-                    union_states,
-                    union_actions,
-                    union_next_states,
+                    union_init_states_[union_init_indices],
+                    expert_states_[expert_indices],
+                    expert_actions_[expert_indices],
+                    expert_next_states_[expert_indices],
+                    union_states_,
+                    union_actions_,
+                    union_next_states_,
                     union_indices,
                     training_info['iteration'],
                     config['power_decay_weight']
@@ -394,20 +465,72 @@ def run(config):
             elif algorithm == 'smodice':
                 # Get rewards
                 with torch.no_grad():
-                    obs_for_disc = torch.from_numpy(np.array(union_states[union_indices].cpu())).to(discriminator.device)
+                    obs_for_disc = torch.from_numpy(np.array(union_states_[union_indices].cpu())).to(discriminator.device)
                     if config['state']:
                         disc_input = obs_for_disc
                     else:
-                        act_for_disc = torch.from_numpy(np.array(union_actions[union_indices].cpu())).to(discriminator.device)
+                        act_for_disc = torch.from_numpy(np.array(union_actions_[union_indices].cpu())).to(discriminator.device)
                         disc_input = torch.cat([obs_for_disc, act_for_disc], axis=1)
                     reward = discriminator.predict_reward(disc_input)
 
-                info_dict = imitator.train_step(union_init_states[union_init_indices],
-                                                    union_states[union_indices], 
-                                                    union_actions[union_indices], 
+                info_dict = imitator.train_step(union_init_states_[union_init_indices],
+                                                    union_states_[union_indices], 
+                                                    union_actions_[union_indices], 
                                                     reward, 
-                                                    union_next_states[union_indices],
-                                                    union_dones[union_indices])
+                                                    union_next_states_[union_indices],
+                                                    union_dones_[union_indices])
+            elif algorithm == 'gwil':
+                if traj_idx < union_states.shape[0]:
+                    traj_len = traj_lens[traj_len_idx]
+                    replay_buffer.add(union_states[traj_idx],
+                                    union_actions[traj_idx], 
+                                    union_next_states[traj_idx], 
+                                    union_dones[traj_idx], 
+                                    union_dones[traj_idx]
+                                    )
+                    traj_idx += 1
+                    traj_count += 1
+                    if traj_idx == (traj_base_num + traj_nums[traj_num_idx]*traj_lens[traj_len_idx]):
+                        traj_base_num += traj_nums[traj_num_idx]*traj_lens[traj_len_idx]
+                        traj_len_idx += 1
+                        traj_num_idx += 1
+                    if (traj_idx == union_states.shape[0]) or (traj_count == traj_len):
+                        traj_count = 0
+                        replay_buffer.process_trajectory(traj_expert[:src_expert_traj_len*10+1], src_expert_traj_len)
+
+                if training_info['iteration'] >= config['num_seed_steps']:
+                    info_dict = imitator.update(replay_buffer, 
+                                                training_info['iteration'], 
+                                                gw=True, normalize_reward=False, 
+                                                normalize_reward_batch=False, 
+                                                include_external_reward=False, 
+                                                weight_external_reward=1, 
+                                                weight_gw_reward=1)
+            elif algorithm == 'igdf':
+                target_batch = target_buffer.sample(256 // 2)
+                src_s, src_a, src_ss, done = source_buffer.sample(256 // 2)
+
+                logits, srcsa_repr, srcss_repr = info(src_s, src_a, src_ss, return_repr = True)
+                srcsa_repr = torch.linalg.norm(srcsa_repr, dim=-1, keepdim=True)  # [128, 1]
+                srcss_repr = torch.linalg.norm(srcss_repr, dim=-1, keepdim=True)  # [128, 1]
+                diagonal_elements = torch.diag(logits).reshape(-1, 1)
+                src_info = diagonal_elements / (srcsa_repr * srcss_repr) # [128, 1]
+
+                sorted_indices = torch.argsort(src_info[:, 0])
+                sorted_num = -64
+                top_half_indices = sorted_indices[sorted_num:]
+                src_s = src_s[top_half_indices]
+                src_a = src_a[top_half_indices]
+                src_ss = src_ss[top_half_indices]
+                done = done[top_half_indices]
+                info_temp = torch.exp(src_info[top_half_indices] * config['igdf_alpha'])
+                mask = torch.ones((128+64, 1)).to(config['device'])
+                mask[:64] = info_temp
+                source_batch = [src_s, src_a, src_ss, done]
+                batch = igdf.merge_batch(source_batch, target_batch)
+                batch = [b.to(config['device']) for b in batch]
+
+                info_dict = trainer.train(batch, mask, training_info['iteration'])
 
             else:
                 raise ValueError(f'Undefined algorithm {algorithm}')
@@ -438,13 +561,14 @@ def run(config):
                 writer.add_scalar('Time weight decay', imitator.c2_smooth**config['power_decay_weight'] / (imitator.c1**config['power_decay_weight'] + imitator.c2_smooth**config['power_decay_weight'] + 1e-6), training_info['iteration'])
 
             # Save checkpoint
-            if (algorithm == 'demodice') and (algorithm == 'avatar_dice'):
+            if (algorithm == 'demodice') or (algorithm == 'avatar_dice'):
                 if training_info['iteration'] % config['save_interval'] == 0:
                     checkpoint_filepath = f"{checkpoint_dir}/{training_info['iteration']}.pickle"
                     imitator.save(checkpoint_filepath, training_info)
 
             training_info['iteration'] += 1
             pbar.update(1)
+
 
 
 if __name__ == "__main__":
@@ -455,5 +579,7 @@ if __name__ == "__main__":
     config = vars(args)
     config['dataset_file_names'] = ast.literal_eval(config['dataset_file_names'])
 
+    cfg = OmegaConf.load("config/iq_learn_conf/sac.yaml")
+
     print("Start running")
-    run(config)
+    run(config, cfg)
