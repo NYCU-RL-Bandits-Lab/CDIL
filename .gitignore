@@ -192,12 +192,17 @@ cython_debug/
 
 dataset/
 
-dataset_mujoco.zip
-dataset_robosuite.zip
+*.zip
 mujoco210-linux-x86_64.tar.gz
 
 tensorboard/
 sensitivity_scan_tfboard/
 sensitivity_scan_tfboard_ablation/
+tf_board/
+*tfboard/
 
 plots/
+pretrained_models/
+runs/
+scripts/$*
+eval_videos/

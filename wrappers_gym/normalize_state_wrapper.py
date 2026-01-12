@@ -21,7 +21,7 @@
 # if config['env_is_gym']:
 #     import gym
 # else:
-import gymnasium as gym
+import gym
 
 
 class NormalizeStateWrapper(gym.ObservationWrapper):

@@ -21,7 +21,8 @@
 # if config['env_is_gym']:
 # import gym
 # else:
-import gymnasium as gym
+import gym
+from gymnasium import spaces
 import numpy as np
 
 
@@ -39,7 +40,7 @@ class AbsorbingWrapper(gym.ObservationWrapper):
     def __init__(self, env):
         super(AbsorbingWrapper, self).__init__(env)
         obs_space = self.observation_space
-        self.observation_space = gym.spaces.Box(
+        self.observation_space = spaces.Box(
             shape=(obs_space.shape[0] + 1,),
             low=obs_space.low[0],
             high=obs_space.high[0],

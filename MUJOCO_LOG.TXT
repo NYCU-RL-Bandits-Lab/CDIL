@@ -1,0 +1,9 @@
+Wed Sep 24 23:16:05 2025
+ERROR: Shadow framebuffer is not complete, error 0x8cd7
+
+Wed Sep 24 23:18:31 2025
+ERROR: Shadow framebuffer is not complete, error 0x8cd7
+
+Wed Sep 24 23:21:20 2025
+ERROR: Shadow framebuffer is not complete, error 0x8cd7
+

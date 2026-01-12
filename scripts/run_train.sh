@@ -70,19 +70,35 @@ python train_il.py \
   --imperfect_num_trajs 10 50
 
 # smodice in target domain(mujoco)
-# python train_il.py \
-#   --env_is_gym=0 \
-#   --algorithm=smodice \
-#   --env_id=Ant \
-#   --xml_path=./env/ant_target.xml \
-#   --dataset_file_names="['target_ant_5_4920.728662537093_848.0.npz', 'target_ant_400_5718.754833834492_987.1325.npz', 'target_Ant-v3_random_100.npz']" \
-#   --src_expert_path=Door_Panda_400_206.56235546643248_500.0.npz \
-#   --load_hdf5_dataset=0 \
-#   --tb_path=tensorboard/smodice_ant_ver1_seed4 \
-#   --log_interval=10000 \
-#   --disc_type=learned \
-#   --actor_lr=1e-4 \
-#   --seed=4 \
+python train_il.py \
+  --env_is_gym=0 \
+  --algorithm=smodice \
+  --env_id=Ant \
+  --xml_path=./env/ant_target.xml \
+  --dataset_file_names="['target_ant_5_4920.728662537093_848.0.npz', 'target_ant_400_5718.754833834492_987.1325.npz', 'target_Ant-v3_random_100.npz']" \
+  --load_hdf5_dataset=0 \
+  --log_interval=10000 \
+  --disc_type=learned \
+  --expert_num_traj 1 \
+  --imperfect_dataset_default_info '(["expert-v2","random-v2"], [1,100])' \
+  --tb_path=smodice_tfboard/smodice_ant_seed0 \
+  --seed=0
+
+python train_il.py \
+  --env_is_gym=0 \
+  --algorithm=smodice \
+  --env_id=Wipe \
+  --env_robot=UR5e \
+  --src_env_robot=Panda \
+  --dataset_file_names="['Wipe_UR5e_5_101.32457334196555_500.0.npz', 'Wipe_UR5e_400_100.22506601753761_500.0.npz', 'Wipe_UR5e_random_100.npz']" \
+  --src_expert_path=Wipe_Panda_400_108.31298115605115_496.2325.npz \
+  --load_hdf5_dataset=0 \
+  --log_interval=10000 \
+  --expert_num_traj 1 \
+  --imperfect_dataset_default_info='(["expert-v2", "random-v2"], [10, 50])' \
+  --critic_lr=1e-4 \
+  --tb_path=smodice_tfboard/smodice_wipe_seed0 \
+  --seed=0
 
 
 # # smodice in target domain(robosuite)\
@@ -105,41 +121,43 @@ python train_il.py \
 #     --seed=${seed} 
 # done
 
-# # gwil in target domain(mujoco)
-# python train_il.py \
-#   --env_is_gym=0 \
-#   --algorithm=gwil \
-#   --env_id=Hopper \
-#   --xml_path=./env/hopper_target.xml \
-#   --dataset_file_names="['target_hopper_5_3091.0554050953983_1000.0.npz', 'target_hopper_400_3075.603734081881_997.5925.npz', 'target_Hopper-v3_random_50.npz']" \
-#   --load_hdf5_dataset=0 \
-#   --tb_path=tensorboard/gwil_hopper_src_traj_1_ver1_seed0 \
-#   --log_interval=10000 \
-#   --disc_type=learned \
-#   --actor_lr=5e-5 \
-#   --seed=0 \
+# gwil in target domain(mujoco)
+python train_il.py \
+  --env_is_gym=0 \
+  --algorithm=gwil \
+  --env_id=Hopper \
+  --xml_path=./env/hopper_target.xml \
+  --dataset_file_names="['target_hopper_5_3091.0554050953983_1000.0.npz', 'target_hopper_400_3075.603734081881_997.5925.npz', 'target_Hopper-v3_random_50.npz']" \
+  --load_hdf5_dataset=0 \
+  --tb_path=tensorboard/gwil_hopper_src_traj_1_ver1_seed0 \
+  --log_interval=10000 \
+  --disc_type=learned \
+  --actor_lr=5e-5 \
+  --seed=0 \
 
 # gwil in target domain(robosuite)
 # for seed in {0..4}
 # do
-#   python train_il.py \
-#     --env_is_gym=0 \
-#     --algorithm=gwil \
-#     --env_id=Door \
-#     --env_robot=UR5e \
-#     --src_env_robot=Panda \
-#     --dataset_file_names="['Door_UR5e_5_218.3826844253832_500.0.npz', 'Door_UR5e_400_212.19304507548483_500.0.npz', 'Door_UR5e_random_100.npz']" \
-#     --src_expert_path=Door_Panda_400_206.56235546643248_500.0.npz \
-#     --load_hdf5_dataset=0 \
-#     --tb_path=tensorboard/gwil_door_src_traj_10_ver2_seed${seed} \
-#     --log_interval=10000 \
-#     --imperfect_dataset_default_info='(["expert-v2", "random-v2"], [1, 100])' \
-#     --disc_type=learned \
-#     --actor_lr=1e-4 \
-#     --seed=${seed}
+  python train_il.py \
+    --env_is_gym=0 \
+    --algorithm=gwil \
+    --env_id=Door \
+    --env_robot=UR5e \
+    --src_env_robot=Panda \
+    --dataset_file_names="['Door_UR5e_5_218.3826844253832_500.0.npz', 'Door_UR5e_400_212.19304507548483_500.0.npz', 'Door_UR5e_random_100.npz']" \
+    --src_expert_path=Door_Panda_400_206.56235546643248_500.0.npz \
+    --load_hdf5_dataset=0 \
+    --tb_path=tensorboard/gwil_door_src_traj_10_ver2_seed${seed} \
+    --log_interval=10000 \
+    --imperfect_dataset_default_info='(["expert-v2", "random-v2"], [1, 100])' \
+    --disc_type=learned \
+    --actor_lr=1e-4 \
+    --seed=${seed}
 # done
 
 # igdf in target domain(mujoco)
+conda activate cdil && \
+export CUDA_VISIBLE_DEVICES=7 && cd ~/src/CDIL && \
 python train_il.py \
   --env_is_gym=0 \
   --algorithm=igdf \
@@ -148,7 +166,7 @@ python train_il.py \
   --dataset_file_names="['target_hopper_5_3091.0554050953983_1000.0.npz', 'target_hopper_400_3075.603734081881_997.5925.npz', 'target_Hopper-v3_random_50.npz']" \
   --load_hdf5_dataset=0 \
   --src_random_path=None \
-  --tb_path=tensorboard/igdf_hopper_ver1_seed0 \
+  --tb_path=idgf_tensorboard/igdf_hopper_ver1_seed0 \
   --imperfect_dataset_default_info='(["expert-v2", "random-v2"], [20, 50])' \
   --log_interval=10000 \
   --actor_lr=5e-5 \
@@ -157,25 +175,26 @@ python train_il.py \
 
 
 # igdf in target domain(robosuite)
-# for seed in {0..4}
-# do
-#     python train_il.py \
-#       --env_is_gym=0 \
-#       --algorithm=igdf \
-#       --env_id=Lift \
-#       --env_robot=UR5e \
-#       --src_env_robot=Panda \
-#       --dataset_file_names="['Lift_UR5e_5_233.24838385195758_500.0.npz', 'Lift_UR5e_400_203.1412076563412_500.0.npz', 'Lift_UR5e_random_100.npz']" \
-#       --load_hdf5_dataset=0 \
-#       --imperfect_dataset_default_info='(["expert-v2", "random-v2"], [1, 100])' \
-#       --src_expert_path=Lift_Panda_400_193.8453640401841_500.0.npz \
-#       --src_random_path=Lift_Panda_random_1600.npz \
-#       --tb_path=tensorboard/igdf_lift_ver1_seed${seed} \
-#       --log_interval=10000 \
-#       --actor_lr=1e-4 \
-#       --batch_size=256 \
-#       --seed=${seed}
-# done
+for seed in {0..4}
+do
+    python train_il.py \
+      --env_is_gym=0 \
+      --algorithm=igdf \
+      --env_id=Lift \
+      --env_robot=UR5e \
+      --src_env_robot=Panda \
+      --dataset_file_names="['Lift_UR5e_5_233.24838385195758_500.0.npz', 'Lift_UR5e_400_203.1412076563412_500.0.npz', 'Lift_UR5e_random_100.npz']" \
+      --load_hdf5_dataset=0 \
+      --imperfect_dataset_default_info='(["expert-v2", "random-v2"], [1, 100])' \
+      --src_expert_path=Lift_Panda_400_193.8453640401841_500.0.npz \
+      --src_random_path=Lift_Panda_random_1600.npz \
+      --tb_path=tensorboard/igdf_lift_ver1_seed${seed} \
+      --log_interval=10000 \
+      --actor_lr=1e-4 \
+      --batch_size=256 \
+      --seed=${seed}
+done
+
 
 
 # datasets

@@ -8,7 +8,7 @@ zcat -qf /var/log/apt/history.log* \
   | sort -u \
   | paste -sd ' ' -
 
---no-install-recommends -y apt-utils autoconf automake build-essential ca-certificates curl gfortran git gnupg htop ibverbs-providers ibverbs-utils iputils-ping jq less libatlas-base-dev libbz2-dev libc-ares2 libedit-dev libegl-mesa0 libegl1-mesa-dev libglfw3 libglib2.0-0 libglx-mesa0 libgoogle-glog-dev libhdf5-dev libhwloc15 libibumad-dev libibumad3 libibverbs-dev libibverbs1 libleveldb-dev liblmdb-dev libncurses6 libncursesw6 libnl-3-dev libnl-route-3-200 libnl-route-3-dev libnss-ldap libnuma-dev libnuma1 libosmesa6 libosmesa6-dev libpam-ldap libpmi2-0-dev libpng-dev libprotobuf-dev librdmacm-dev librdmacm1 libre2-dev libsnappy-dev libsndfile1 libtcmalloc-minimal4 libtool nano nasm neovim ninja-build numactl nvtop openssh-client openssh-server patch patchelf pkg-config protobuf-compiler python-is-python3 python3 python3-dev python3-venv python3.12-dev rapidjson-dev ripgrep screen sox sudo supervisor tmux tree unzip vim wget
+sudo apt update && sudo apt install --no-install-recommends -y apt-utils autoconf automake build-essential ca-certificates curl gfortran git gnupg htop ibverbs-providers ibverbs-utils iputils-ping jq less libatlas-base-dev libbz2-dev libc-ares2 libedit-dev libegl-mesa0 libegl1-mesa-dev libglfw3 libglib2.0-0 libglx-mesa0 libgoogle-glog-dev libhdf5-dev libhwloc15 libibumad-dev libibumad3 libibverbs-dev libibverbs1 libleveldb-dev liblmdb-dev libncurses6 libncursesw6 libnl-3-dev libnl-route-3-200 libnl-route-3-dev libnss-ldap libnuma-dev libnuma1 libosmesa6 libosmesa6-dev libpam-ldap libpmi2-0-dev libpng-dev libprotobuf-dev librdmacm-dev librdmacm1 libre2-dev libsnappy-dev libsndfile1 libtcmalloc-minimal4 libtool nano nasm neovim ninja-build numactl nvtop openssh-client openssh-server patch patchelf pkg-config protobuf-compiler python-is-python3 python3 python3-dev python3-venv python3.12-dev rapidjson-dev ripgrep screen sox sudo supervisor tmux tree unzip vim wget zip unzip
 
 
 
@@ -28,11 +28,54 @@ python train_il.py \
   --flow_model_path=./flow_model/hopper/model/hopper_flow_seed1.pt \
   --flow_model_action_path=./flow_model/hopper/model_action/hopper_flow_seed1.pt \
   --expert_num_traj 1 \
-  --imperfect_dataset_default_info '(["expert-v2","random-v2"], [20,50])' \
-  --actor_lr 5e-5 \
-  --tb_path=sensitivity_scan_tfboard/hopper_set1_seed0 \
-  --seed 0
+  --imperfect_dataset_default_info '(["expert-v2","random-v2"], [10,50])' \
+  --log_interval 10000 \
+  --critic_lr 1e-4 \
+  --seed 1 \
+  --tb_path 'tfboard/avatardice/hopper_set1_seed1'
   # --imperfect_num_trajs 20 50 \
+
+
+
+
+export CUDA_VISIBLE_DEVICES=1 && \
+cd ~/src/CDIL && conda activate cdil && \
+python train_il.py \
+  --env_is_gym=0 \
+  --algorithm=igdf \
+  --env_id=Hopper \
+  --xml_path=./env/hopper_target.xml \
+  --dataset_file_names="['target_hopper_5_3091.0554050953983_1000.0.npz', 'target_hopper_400_3075.603734081881_997.5925.npz', 'target_Hopper-v3_random_50.npz']" \
+  --load_hdf5_dataset=0 \
+  --log_interval=10000 \
+  --expert_num_traj 1 \
+  --imperfect_dataset_default_info '(["expert-v2","random-v2"], [10,50])' \
+  --log_interval 10000 \
+  --critic_lr 1e-4 \
+  --seed 1 \
+  --tb_path 'tfboard/igdf/hopper_set2_seed1'
+
+
+export CUDA_VISIBLE_DEVICES=2 && \
+cd ~/src/CDIL && conda activate cdil && \
+python train_il.py \
+  --env_is_gym=0 \
+  --algorithm=igdf \
+  --env_id=Hopper \
+  --xml_path=./env/hopper_target.xml \
+  --dataset_file_names="['target_hopper_400_3075.603734081881_997.5925.npz', 'target_hopper_400_3075.603734081881_997.5925.npz', 'target_Hopper-v3_random_500.npz']" \
+  --load_hdf5_dataset=0 \
+  --log_interval=10000 \
+  --expert_num_traj 10 \
+  --imperfect_dataset_default_info '(["expert-v2","random-v2"], [400,400])' \
+  --log_interval 10000 \
+  --critic_lr 1e-4 \
+  --seed 0 \
+  --tb_path 'tfboard/igdf/hopper_set2_seed0'
+
+
+
+
 
 2.
 export CUDA_VISIBLE_DEVICES=0 && \
@@ -63,14 +106,14 @@ python train_il.py \
   --algorithm=avatar_dice \
   --env_id=Hopper \
   --xml_path=./env/hopper_target.xml \
-  --dataset_file_names="['target_hopper_5_3091.0554050953983_1000.0.npz', 'target_hopper_400_3075.603734081881_997.5925.npz', 'target_Hopper-v3_random_100.npz']" \
+  --dataset_file_names="['target_hopper_5_3091.0554050953983_1000.0.npz', 'target_hopper_400_3075.603734081881_997.5925.npz', None]" \
   --load_hdf5_dataset=0 \
   --log_interval=10000 \
   --pretrained_model_path=./pretrained_models/hopper.pickle \
   --flow_model_path=./flow_model/hopper/model/hopper_flow_seed1.pt \
   --flow_model_action_path=./flow_model/hopper/model_action/hopper_flow_seed1.pt \
   --expert_num_traj 1 \
-  --imperfect_dataset_default_info '(["expert-v2","random-v2"], [50,100])' \
+  --imperfect_dataset_default_info '(["expert-v2","random-v2"], [50,500])' \
   --actor_lr 5e-5 \
   --tb_path=sensitivity_scan_tfboard/hopper_set3_seed0 \
   --seed 0
@@ -133,7 +176,7 @@ python train_il.py \
   --log_interval=10000 \
   --pretrained_model_path=./pretrained_models/wipe.pickle \
   --expert_num_traj 1 \
-  --imperfect_dataset_default_info '(["expert-v2","random-v2"], [50,100])' \
+  --imperfect_dataset_default_info '(["expert-v2","random-v2"], [50,500])' \
   --critic_lr 1e-4 \
   --tb_path=sensitivity_scan_tfboard/wipe_set3_seed0 \
   --seed 0

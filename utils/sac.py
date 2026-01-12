@@ -2,7 +2,7 @@ import os
 import numpy as np
 import torch
 import torch.nn.functional as F
-from torch.optim import Adam
+from torch.optim.adam import Adam
 import hydra
 
 from agent.igdf import soft_update

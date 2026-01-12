@@ -233,26 +233,24 @@ def main():
     ap = argparse.ArgumentParser(
         description="2x3 grid: one subplot per env; within each subplot, lines = sets (mean across seeds) + ±std shading."
     )
-    ap.add_argument("--base", default="sensitivity_scan_tfboard",
+    ap.add_argument("--base", default="tfboard/smodice",
                     help="Root containing <env>_set<k>_seed<i> folders.")
-    ap.add_argument("--envs", default="",
-                    help="Comma-separated list of 6 env names (e.g., ant,cheetah,door,hopper,lift,wipe). Auto-discover if empty.")
+    ap.add_argument("--envs", default="hopper,ant,cheetah,door,lift,wipe",
+                    help="Comma-separated list of 6 env names (e.g., hopper,ant,cheetah,door,lift,wipe). Auto-discover if empty.")
     ap.add_argument("--sets", type=int, nargs="+",
-                    default=[1, 2, 3], help="Set IDs to include (default: 1 2 3).")
+                    default=[1], help="Set IDs to include (default: 1).")
     ap.add_argument("--seeds-per-set", type=int, default=5,
                     help="Seeds per (env,set) to aggregate (default: 5).")
     ap.add_argument("--tag", default="Test average return",
                     help="Scalar tag to read.")
-    ap.add_argument(
-        "--out", default="plots_grid/6envs_sets_grid.png", help="Output image path.")
-    ap.add_argument(
-        "--title", default="Sensitivity Scan (6 envs)", help="Figure title.")
-    ap.add_argument("--smooth", type=int, default=1,
+    ap.add_argument("--out", default="plots/plot_grid/avatardice.png", help="Output image path.")
+    ap.add_argument("--title", default="avatardice set1", help="Figure title.")
+    ap.add_argument("--smooth", type=int, default=5,
                     help="Uniform smoothing window for mean (>=1).")
-    ap.add_argument("--smooth-std", type=int, default=1,
+    ap.add_argument("--smooth-std", type=int, default=5,
                     help="Uniform smoothing window for std band (>=1).")
     ap.add_argument("--std-scale", type=float, default=0.5,
-                    help="Shaded band size in std units (e.g., 0.5 => ±0.5σ).")
+                    help="Shaded band size in std units (e.g., 0.5 => ±0.5 sigma).")
     ap.add_argument("--alpha", type=float, default=0.20,
                     help="Alpha for shaded std band.")
     ap.add_argument("--linewidth", type=float,

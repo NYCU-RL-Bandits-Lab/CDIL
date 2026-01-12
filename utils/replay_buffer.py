@@ -5,6 +5,7 @@ import numpy as np
 import torch
 import ot
 import scipy as sp
+import random
 
 class ReplayBuffer(object):
     """Buffer to store environment transitions."""
@@ -66,15 +67,17 @@ class ReplayBuffer(object):
             traj_agent = np.concatenate((traj_agent,actions_trajectory), axis=1)
 
         idx = 0
-        gw_rewards_list = []
-        while idx + traj_len <= traj_expert.shape[0]:
-            one_traj_expert = traj_expert[idx:idx+traj_len]
-            gw_rewards = self.compute_gw_reward(one_traj_expert, traj_agent, metric_expert, metric_agent,
-                                                          entropic, sinkhorn_reg=sinkhorn_reg)
-            idx += traj_len
-            gw_rewards_list.append(gw_rewards)
-            # print(gw_rewards)
-        gw_rewards = np.mean(gw_rewards_list, axis=0)
+        # idx = random.randint(0, 9)
+        # gw_rewards_list = []
+        # while idx + traj_len <= traj_expert.shape[0]:
+        # idx *= traj_len
+        one_traj_expert = traj_expert[idx:idx+traj_len]
+        gw_rewards = self.compute_gw_reward(one_traj_expert, traj_agent, metric_expert, metric_agent,
+                                                        entropic, sinkhorn_reg=sinkhorn_reg)
+        # idx += traj_len
+        # gw_rewards_list.append(gw_rewards)
+        # print(gw_rewards)
+        # gw_rewards = np.mean(gw_rewards_list, axis=0)
         # print('gw_rewards: ', gw_rewards)
         if self.idx == 0:
             self.gw_rewards[self.idx_gw:] = np.expand_dims(gw_rewards, axis=1)

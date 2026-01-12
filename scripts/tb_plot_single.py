@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import argparse
 import os
 import sys
@@ -128,7 +127,7 @@ def make_plot(steps, values, title, xlabel, ylabel, out, smooth_win, std_win, al
 
     ax.legend(loc='best', frameon=True)
     fig.tight_layout()
-    out = Path(out)
+    out = Path(f"plots/{out}")
     out.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(out, format='png', bbox_inches='tight', pad_inches=0.3)
     print(f"Saved plot -> {out}")
@@ -148,14 +147,13 @@ def main():
     parser.add_argument("--xlabel", default="Steps", help="X-axis label.")
     parser.add_argument(
         "--ylabel", default="Test Average Return", help="Y-axis label.")
-    parser.add_argument("--out", default="tb_single_plot.png",
-                        help="Output PNG path.")
+    parser.add_argument("--out", help="Output PNG path.")
     parser.add_argument("--smooth-window", type=int, default=5,
                         help="Uniform smoothing window size (>=1).")
-    parser.add_argument("--std-window", type=int, default=0,
+    parser.add_argument("--std-window", type=int, default=5,
                         help="Rolling std window size for shading (0 to disable).")
     parser.add_argument("--std-alpha", type=float,
-                        default=0.20, help="Alpha for std shading.")
+                        default=0.0, help="Alpha for std shading.")
     parser.add_argument("--linewidth", type=float,
                         default=3.5, help="Main line width.")
     parser.add_argument("--markersize", type=float,
@@ -177,13 +175,14 @@ def main():
         sys.exit(2)
 
     title = args.title or event_file.parent.name
+    out = args.out or event_file.parent.name + ".png"
     make_plot(
         steps=steps,
         values=values,
         title=title,
         xlabel=args.xlabel,
         ylabel=args.ylabel,
-        out=args.out,
+        out=out,
         smooth_win=max(1, args.smooth_window),
         std_win=max(0, args.std_window),
         alpha_std=args.std_alpha,

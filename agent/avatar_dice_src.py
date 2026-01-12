@@ -156,12 +156,12 @@ class Avatar(nn.Module):
     def get_training_state(self):
         training_state = {
             'cost_params': [(name, param.detach().cpu().numpy()) for name, param in self.cost.named_parameters()],
-            'critic_params': [(name, param.detach().cpu().numpy()) for name, param in self.critic.named_parameters()],
+            # 'critic_params': [(name, param.detach().cpu().numpy()) for name, param in self.critic.named_parameters()],
             'actor_params': [(name, param.detach().cpu().numpy()) for name, param in self.actor.named_parameters()],
             'decoder_params': [(name, param.detach().cpu().numpy()) for name, param in self.decoder.named_parameters()],
             'action_decoder_params': [(name, param.detach().cpu().numpy()) for name, param in self.action_decoder.named_parameters()],
             'cost_optimizer_state': self.cost_optimizer.state_dict(),
-            'critic_optimizer_state': self.critic_optimizer.state_dict(),
+            # 'critic_optimizer_state': self.critic_optimizer.state_dict(),
             'actor_optimizer_state': self.actor_optimizer.state_dict(),
             'decoder_optimizer_state': self.decoder_optimizer.state_dict(),
             'action_decoder_optimizer_state': self.action_decoder_optimizer.state_dict(),
@@ -170,12 +170,12 @@ class Avatar(nn.Module):
 
     def set_training_state(self, training_state):
         self.cost.load_state_dict({name: torch.tensor(value) for name, value in training_state['cost_params']})
-        self.critic.load_state_dict({name: torch.tensor(value) for name, value in training_state['critic_params']})
+        # self.critic.load_state_dict({name: torch.tensor(value) for name, value in training_state['critic_params']})
         self.actor.load_state_dict({name: torch.tensor(value) for name, value in training_state['actor_params']})
         self.decoder.load_state_dict({name: torch.tensor(value) for name, value in training_state['decoder_params']})
         self.action_decoder.load_state_dict({name: torch.tensor(value) for name, value in training_state['action_decoder_params']})
         self.cost_optimizer.load_state_dict(training_state['cost_optimizer_state'])
-        self.critic_optimizer.load_state_dict(training_state['critic_optimizer_state'])
+        # self.critic_optimizer.load_state_dict(training_state['critic_optimizer_state'])
         self.actor_optimizer.load_state_dict(training_state['actor_optimizer_state'])
         self.decoder_optimizer.load_state_dict(training_state['decoder_optimizer_state'])
         self.action_decoder_optimizer.load_state_dict(training_state['action_decoder_optimizer_state'])

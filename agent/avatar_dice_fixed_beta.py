@@ -62,11 +62,10 @@ class Avatar(nn.Module):
         self.c1 = 0.0
         self.c2_smooth = 0.0
         self.l2 = 0.0
-        self.psi = config["psi"]
 
 
     def update(self, init_states, expert_states, expert_actions, expert_next_states,
-               union_states, union_actions, union_next_states, union_indices, timestep, power_weight_decay=1, beta=0):#,source_shift=None, source_scale=None):
+               union_states, union_actions, union_next_states, union_indices, timestep, power_weight_decay=1, beta=0.3):#,source_shift=None, source_scale=None):
         self.cost_optimizer.zero_grad()
         self.critic_optimizer.zero_grad()
         self.actor_optimizer.zero_grad()
@@ -154,59 +153,59 @@ class Avatar(nn.Module):
         src_weight = src_weight / src_weight.mean()
 
         # Adaptive decay weight
-        if timestep % 10 == 0:
-            with torch.no_grad():
-                all_state_output = self.decoder(all_union_states)
-                if self.flow_in_decoder:
-                    all_state_output = self.flow_model.g(self.decoder(all_union_states).double())[0].float()
-                all_state_output = torch.cat([all_state_output, torch.zeros([all_state_output.shape[0], 1]).to(self.device)], -1)
-                all_next_state_output = self.decoder(all_union_next_states)
-                if self.flow_in_decoder:
-                    all_next_state_output = self.flow_model.g(self.decoder(all_union_next_states).double())[0].float()
-                all_next_state_output = torch.cat([all_next_state_output, torch.zeros([all_next_state_output.shape[0], 1]).to(self.device)], -1)
+        # if timestep % 10 == 0:
+            # with torch.no_grad():
+            #     all_state_output = self.decoder(all_union_states)
+            #     if self.flow_in_decoder:
+            #         all_state_output = self.flow_model.g(self.decoder(all_union_states).double())[0].float()
+            #     all_state_output = torch.cat([all_state_output, torch.zeros([all_state_output.shape[0], 1]).to(self.device)], -1)
+            #     all_next_state_output = self.decoder(all_union_next_states)
+            #     if self.flow_in_decoder:
+            #         all_next_state_output = self.flow_model.g(self.decoder(all_union_next_states).double())[0].float()
+            #     all_next_state_output = torch.cat([all_next_state_output, torch.zeros([all_next_state_output.shape[0], 1]).to(self.device)], -1)
                 
-                all_input = torch.cat([all_union_states, all_union_actions], -1)
-                all_action_output = self.action_decoder(all_input)
-                if self.flow_in_decoder:
-                    all_action_output = self.action_flow_model.g(self.action_decoder(all_input).double())[0].float()
-                all_src_input = torch.cat([all_state_output, all_action_output], -1)
+            #     all_input = torch.cat([all_union_states, all_union_actions], -1)
+            #     all_action_output = self.action_decoder(all_input)
+            #     if self.flow_in_decoder:
+            #         all_action_output = self.action_flow_model.g(self.action_decoder(all_input).double())[0].float()
+            #     all_src_input = torch.cat([all_state_output, all_action_output], -1)
 
-                all_union_cost_val = self.cost(all_input)
-                all_union_cost = torch.log(1 / (all_union_cost_val + EPS2) - 1 + EPS2)
+            #     all_union_cost_val = self.cost(all_input)
+            #     all_union_cost = torch.log(1 / (all_union_cost_val + EPS2) - 1 + EPS2)
 
-                all_union_nu = self.critic(all_union_states)
-                all_union_next_nu = self.critic(all_union_next_states)
-                all_union_adv_nu = - all_union_cost + self.discount * all_union_next_nu - all_union_nu
+            #     all_union_nu = self.critic(all_union_states)
+            #     all_union_next_nu = self.critic(all_union_next_states)
+            #     all_union_adv_nu = - all_union_cost + self.discount * all_union_next_nu - all_union_nu
 
-                next_all_input = torch.cat([all_union_next_states, self.actor(all_union_next_states)[0]], -1)
-                all_next_action_output = self.action_decoder(next_all_input)
-                if self.flow_in_decoder:
-                    all_next_action_output = self.action_flow_model.g(self.action_decoder(next_all_input).double())[0].float()
-                all_src_next_input = torch.cat([all_next_state_output, all_next_action_output], -1)
+            #     next_all_input = torch.cat([all_union_next_states, self.actor(all_union_next_states)[0]], -1)
+            #     all_next_action_output = self.action_decoder(next_all_input)
+            #     if self.flow_in_decoder:
+            #         all_next_action_output = self.action_flow_model.g(self.action_decoder(next_all_input).double())[0].float()
+            #     all_src_next_input = torch.cat([all_next_state_output, all_next_action_output], -1)
 
-                all_src_qvalue = self.src_critic(all_src_input)
-                all_src_next_qvalue = self.src_critic(all_src_next_input)
-                all_src_union_adv_nu = - all_union_cost + self.discount * all_src_next_qvalue - all_src_qvalue
+            #     all_src_qvalue = self.src_critic(all_src_input)
+            #     all_src_next_qvalue = self.src_critic(all_src_next_input)
+            #     all_src_union_adv_nu = - all_union_cost + self.discount * all_src_next_qvalue - all_src_qvalue
 
-                self.c1 = torch.abs(
-                    torch.exp((all_src_union_adv_nu - torch.max(all_src_union_adv_nu)) / self.non_expert_regularization) - 
-                    torch.exp((all_union_adv_nu - torch.max(all_union_adv_nu)) / self.non_expert_regularization)
-                ).mean().item()
-                if hasattr(self, 'prev_union_adv_nu'):
-                    c2 = torch.abs(
-                        torch.exp((all_union_adv_nu - torch.max(all_union_adv_nu)) / self.non_expert_regularization) - 
-                        torch.exp((self.prev_union_adv_nu - torch.max(self.prev_union_adv_nu)) / self.non_expert_regularization)
-                    ).mean().item()
-                    self.c2_smooth = self.psi * self.c2_smooth + (1 - self.psi) * c2 if hasattr(self, 'c2_smooth') else c2
-                else:
-                    self.c2_smooth = 1.0
-                self.prev_union_adv_nu = all_union_adv_nu.detach().clone()
-        # 計算 alpha(t) = c2 / (c1 + c2)
-        time_weight_decay = self.c2_smooth**power_weight_decay / (self.c1**power_weight_decay + self.c2_smooth**power_weight_decay + 1e-6)
+            #     self.c1 = torch.abs(
+            #         torch.exp((all_src_union_adv_nu - torch.max(all_src_union_adv_nu)) / self.non_expert_regularization) - 
+            #         torch.exp((all_union_adv_nu - torch.max(all_union_adv_nu)) / self.non_expert_regularization)
+            #     ).mean().item()
+            #     if hasattr(self, 'prev_union_adv_nu'):
+            #         c2 = torch.abs(
+            #             torch.exp((all_union_adv_nu - torch.max(all_union_adv_nu)) / self.non_expert_regularization) - 
+            #             torch.exp((self.prev_union_adv_nu - torch.max(self.prev_union_adv_nu)) / self.non_expert_regularization)
+            #         ).mean().item()
+            #         self.c2_smooth = 0.9 * self.c2_smooth + 0.1 * c2 if hasattr(self, 'c2_smooth') else c2
+            #     else:
+            #         self.c2_smooth = 1.0
+            #     self.prev_union_adv_nu = all_union_adv_nu.detach().clone()
+        # # 計算 alpha(t) = c2 / (c1 + c2)
+        # time_weight_decay = self.c2_smooth**power_weight_decay / (self.c1**power_weight_decay + self.c2_smooth**power_weight_decay + 1e-6)
 
         l2_loss = sum(p.norm(2).sum() for p in self.actor.parameters()) * 1e-2
         pi_loss = - torch.mean(
-            (time_weight_decay * src_weight.detach() + (1 - time_weight_decay) * weight.detach()) * self.actor.get_log_prob(union_states, union_actions)
+            (beta * src_weight.detach() + (1 - beta) * weight.detach()) * self.actor.get_log_prob(union_states, union_actions)
         ) + l2_loss
         self.l2 = l2_loss.item()
                 

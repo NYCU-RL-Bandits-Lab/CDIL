@@ -16,7 +16,7 @@ import agent.gwil as gwil
 import agent.smodice as smodice
 import agent.demodice as demodice
 import math
-import wrappers
+import wrappers_gym as wrappers
 from tqdm import trange
 from tqdm import tqdm
 import torch
@@ -61,45 +61,22 @@ def evaluate_d4rl(
     xml_path = config["xml_path"]
     env_robot = config["env_robot"]
 
-    if xml_path:
-        eval_env = wrappers.create_il_env(
-            env_name=env_id + "-v3",
-            shift=shift_env,
-            scale=scale_env,
-            normalized_box_actions=False,
-            xml_path=config["xml_path"],
-        )
-    elif env_robot:
-        eval_env = wrappers.create_il_env(
-            env_name=env_id,
-            shift=shift_env,
-            scale=scale_env,
-            normalized_box_actions=False,
-            robot=config["env_robot"],
-        )
-    else:
-        eval_env = wrappers.create_il_env(
-            env_id + "-v2",
-            shift=shift_env,
-            scale=scale_env,
-            normalized_box_actions=False,
-        )
+    eval_env = wrappers.create_il_env(
+        env_id,
+        shift=shift_env,
+        scale=scale_env,
+        normalized_box_actions=False,
+    )
 
     for _ in range(num_seed):
         for _ in range(num_episodes):
-            # if env_is_gym:
-                # state = eval_env.reset()
-            # else:
-            state = eval_env.reset(seed=seeds)[0]
+            state = eval_env.reset(seed=seeds)
 
             done = False
             length = 0
             while not done:
                 if "ant" in env_id.lower():
-                    if env_is_gym:
-                        state = np.concatenate((state[:27], [0.0]), -1)
-                    else:
-                        state = np.concatenate((state[:31], [0.0]), -1)
+                    state = np.concatenate((state[:27], [0.0]), -1)
 
                 if config["algorithm"] == "smodice":
                     actions = actor.step((np.array([state])).astype(np.float32))
@@ -113,10 +90,7 @@ def evaluate_d4rl(
                 else:
                     action = actor.step(state)[0].numpy()
 
-                # if env_is_gym:
-                #     next_state, reward, done, _ = eval_env.step(action)
-                # else:
-                next_state, reward, done, _, _ = eval_env.step(action)
+                next_state, reward, done, _ = eval_env.step(action)
 
                 total_returns += reward
                 total_timesteps += 1
@@ -188,7 +162,7 @@ def run(config, cfg):
             expert_num_traj,
             start_idx=0,
         )
-    elif xml_path:
+    else:
         (
             expert_initial_states,
             expert_states,
@@ -202,22 +176,6 @@ def run(config, cfg):
             dataset_path,
             difficulty="expert",
             dtype=np.float32,
-        )
-    elif env_robot:
-        (
-            expert_initial_states,
-            expert_states,
-            expert_actions,
-            expert_next_states,
-            expert_dones,
-        ) = utils.sample_demonstrations(
-            env_id=env_id,
-            num_trajectories=expert_num_traj,
-            load_path=dataset_path,
-            max_episode_steps=500,
-            difficulty="expert",
-            dtype=np.float32,
-            env_robot=env_robot,
         )
 
     traj_nums.append(expert_num_traj)
@@ -261,7 +219,7 @@ def run(config, cfg):
                         start_idx=start_idx,
                     )
                 )
-            elif xml_path:
+            else:
                 (initial_states, states, actions, next_states, dones) = (
                     utils.sample_demonstrations(
                         env_id + "-v3",
@@ -270,18 +228,6 @@ def run(config, cfg):
                         load_paths[index],
                         difficulty=imperfect_dataset_name[:6],
                         dtype=np.float32,
-                    )
-                )
-            elif env_robot:
-                (initial_states, states, actions, next_states, dones) = (
-                    utils.sample_demonstrations(
-                        env_id=env_id,
-                        num_trajectories=imperfect_num_traj,
-                        load_path=load_paths[index],
-                        max_episode_steps=500,
-                        difficulty=imperfect_dataset_name[:6],
-                        dtype=np.float32,
-                        env_robot=env_robot,
                     )
                 )
             if not load_hdf5_dataset:
@@ -327,39 +273,19 @@ def run(config, cfg):
 
     # environment setting
     if "ant" in env_id.lower():
-        if load_hdf5_dataset:
-            shift_env = np.concatenate((shift, np.zeros(84)))
-            scale_env = np.concatenate((scale, np.ones(84)))
-        else:
-            shift_env = np.concatenate((shift, np.zeros(102)))
-            scale_env = np.concatenate((scale, np.ones(102)))
+        shift_env = np.concatenate((shift, np.zeros(84)))
+        scale_env = np.concatenate((scale, np.ones(84)))
     else:
         shift_env = shift
         scale_env = scale
 
-    if load_hdf5_dataset:
-        env = wrappers.create_il_env(
-            env_name=env_id + "-v2",
-            shift=shift_env,
-            scale=scale_env,
-            normalized_box_actions=False,
-        )
-    elif xml_path:
-        env = wrappers.create_il_env(
-            env_name=env_id + "-v3",
-            shift=shift_env,
-            scale=scale_env,
-            normalized_box_actions=False,
-            xml_path=xml_path,
-        )
-    elif env_robot:
-        env = wrappers.create_il_env(
-            env_name=env_id,
-            shift=shift_env,
-            scale=scale_env,
-            normalized_box_actions=False,
-            robot=env_robot,
-        )
+    env = wrappers.create_il_env(
+        env_name=env_id,
+        shift=shift_env,
+        scale=scale_env,
+        normalized_box_actions=False,
+        robot=env_robot,
+    )
 
     if config["using_absorbing"]:
         # using absorbing state
@@ -390,6 +316,7 @@ def run(config, cfg):
         union_states = np.c_[
             union_states, np.zeros(len(union_states), dtype=np.float32)
         ]
+        print(union_states.shape)
         union_next_states = np.c_[
             union_next_states, np.zeros(len(union_next_states), dtype=np.float32)
         ]
@@ -402,10 +329,7 @@ def run(config, cfg):
             observation_dim = 14
 
     if "ant" in env_id.lower():
-        if load_hdf5_dataset:
-            observation_dim = 28
-        else:
-            observation_dim = 32
+        observation_dim = 28
 
     # Create imitator
     is_discrete_action = env.action_space.dtype == int
@@ -431,7 +355,7 @@ def run(config, cfg):
                 normalized_box_actions=False,
                 robot=config["src_env_robot"],
             )
-        if xml_path and ("ant" in env_id.lower()):
+        if "ant" in env_id.lower():
             src_obs_dim = 28
         else:
             src_obs_dim = src_env.observation_space.shape[0]
@@ -463,33 +387,15 @@ def run(config, cfg):
         )
     elif algorithm == "smodice":
         # load src trajectory
-        if xml_path:
-            (
-                src_expert_initial_states,
-                src_expert_states,
-                src_expert_actions,
-                src_expert_next_states,
-                src_expert_dones,
-            ) = utils.load_d4rl_data(
-                dataset_dir, env_id + "-v2", expert_dataset_name, 400, start_idx=0
-            )
-        else:
-            src_dataset_path = os.path.join(dataset_dir, config["src_expert_path"])
-            (
-                src_expert_initial_states,
-                src_expert_states,
-                src_expert_actions,
-                src_expert_next_states,
-                src_expert_dones,
-            ) = utils.sample_demonstrations(
-                env_id=env_id,
-                num_trajectories=400,
-                load_path=src_dataset_path,
-                max_episode_steps=500,
-                difficulty="expert",
-                dtype=np.float32,
-                env_robot=config["src_env_robot"],
-            )
+        (
+            src_expert_initial_states,
+            src_expert_states,
+            src_expert_actions,
+            src_expert_next_states,
+            src_expert_dones,
+        ) = utils.load_d4rl_data(
+            dataset_dir, env_id + "-v2", expert_dataset_name, 400, start_idx=0
+        )
 
         # normalize expert dataset
         disc_cutoff = observation_dim - 1
@@ -540,35 +446,18 @@ def run(config, cfg):
             observation_spec=observation_dim, action_spec=action_dim, config=config
         )
     elif algorithm == "gwil":
-        if xml_path:
-            (
-                src_expert_initial_states,
-                src_expert_states,
-                src_expert_actions,
-                src_expert_next_states,
-                src_expert_dones,
-            ) = utils.load_d4rl_data(
-                dataset_dir, env_id + "-v2", expert_dataset_name, 10, start_idx=0
-            )
-        else:
-            src_dataset_path = os.path.join(dataset_dir, config["src_expert_path"])
-            (
-                src_expert_initial_states,
-                src_expert_states,
-                src_expert_actions,
-                src_expert_next_states,
-                src_expert_dones,
-            ) = utils.sample_demonstrations(
-                env_id=env_id,
-                num_trajectories=10,
-                load_path=src_dataset_path,
-                max_episode_steps=500,
-                difficulty="expert",
-                dtype=np.float32,
-                env_robot=config["src_env_robot"],
-            )
+        (
+            src_expert_initial_states,
+            src_expert_states,
+            src_expert_actions,
+            src_expert_next_states,
+            src_expert_dones,
+        ) = utils.load_d4rl_data(
+            dataset_dir, env_id + "-v2", expert_dataset_name, 1, start_idx=0
+        )
+
         traj_expert = np.concatenate((src_expert_states, src_expert_actions), axis=1)
-        src_expert_traj_len = math.ceil(src_expert_states.shape[0] / 10)
+        src_expert_traj_len = math.ceil(src_expert_states.shape[0])
         imitator = gwil.GWIL(
             obs_dim=observation_dim,
             action_dim=action_dim,
@@ -788,7 +677,7 @@ def run(config, cfg):
                     if (traj_idx == union_states.shape[0]) or (traj_count == traj_len):
                         traj_count = 0
                         replay_buffer.process_trajectory(
-                            traj_expert[: src_expert_traj_len * 10 + 1],
+                            traj_expert[:src_expert_traj_len],
                             src_expert_traj_len,
                         )
 

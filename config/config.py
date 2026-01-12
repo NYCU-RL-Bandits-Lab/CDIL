@@ -39,8 +39,8 @@ def get_parser():
     parser.add_argument('--expert_num_traj', default=1, type=int)
     parser.add_argument('--imperfect_dataset_names', default=[], action='append')
     parser.add_argument('--imperfect_num_trajs', default=[], nargs='*', type=int)
-    # parser.add_argument('--imperfect_dataset_default_info', default=(["expert-v2", "random-v2"], [50, 500])) # source: [400, 1600] , target: [50, 200]\[10, 100], default=(["expert-v2", "random-v2"], [1, 100]), default=(["expert-v1", "cloned-v1"], [400, 1600])
-    parser.add_argument('--imperfect_dataset_default_info', type=ast.literal_eval, default=(["expert-v2", "random-v2"], [50, 500])) # source: [400, 1600] , target: [50, 200]\[10, 100], default=(["expert-v2", "random-v2"], [1, 100]), default=(["expert-v1", "cloned-v1"], [400, 1600])
+    parser.add_argument('--imperfect_dataset_default_info', default=(["expert-v2", "random-v2"], [50, 500])) # source: [400, 1600] , target: [50, 200]\[10, 100], default=(["expert-v2", "random-v2"], [1, 100]), default=(["expert-v1", "cloned-v1"], [400, 1600])
+    # parser.add_argument('--imperfect_dataset_default_info', type=ast.literal_eval, default=(["expert-v2", "random-v2"], [50, 500])) # source: [400, 1600] , target: [50, 200]\[10, 100], default=(["expert-v2", "random-v2"], [1, 100]), default=(["expert-v1", "cloned-v1"], [400, 1600])
     parser.add_argument('--resume', default=False, type=bool)
     parser.add_argument('--tb_path', default=None, type=str)
     # avatar DICE
@@ -48,13 +48,14 @@ def get_parser():
     parser.add_argument('--flow_model_path', default=None, type=str)
     parser.add_argument('--flow_model_action_path', default=None, type=str)
     parser.add_argument('--power_decay_weight', default=1, type=int)
+    parser.add_argument('--beta', default=0.3, type=float)
     # smodice
     parser.add_argument('--hidden_sizes', default=(256, 256))
     parser.add_argument('--disc_type', default='learned', type=str)  
     parser.add_argument('--use_policy_entropy_constraint', default=False, type=boolean)
     parser.add_argument('--target_entropy', default=None, type=float)
     parser.add_argument('--f', default='kl', type=str)
-    parser.add_argument('--disc_iterations', default=int(1e3), type=int)
+    parser.add_argument('--disc_iterations', default=int(1e2), type=int)
     parser.add_argument('--v_l2_reg', default=0.0001, type=float)
     parser.add_argument('--mean_range', default=(-7.24, 7.24))
     parser.add_argument('--logstd_range', default=(-5., 2.))
@@ -76,7 +77,7 @@ def get_parser():
     parser.add_argument('--igdf_alpha', default=1.0, type=float)
 
     # optional
-    parser.add_argument('--device', default='cuda:0', type=str)
+    parser.add_argument('--device', default='cuda', type=str)
     parser.add_argument('--total_iterations', default=int(5e5), type=int)
     parser.add_argument('--save_interval', default=int(1e4), type=int)
     parser.add_argument('--log_interval', default=int(1e4), type=int)
@@ -92,4 +93,8 @@ def get_parser():
     parser.add_argument('--use_last_layer_bias_critic', default=False, type=bool)
     parser.add_argument('--kernel_initializer', default='he_normal', type=str)
     parser.add_argument('--seed', default=0, type=int)
+    parser.add_argument('--src_only', default=False, type=bool)
+    parser.add_argument('--fixed_beta', default=False, type=bool)
+    parser.add_argument('--psi', default=0.9, type=float)
+    
     return parser

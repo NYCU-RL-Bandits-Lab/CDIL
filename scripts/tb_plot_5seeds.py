@@ -5,11 +5,12 @@
 
 # tag = "Test average return"
 # for p in [
-#     "sensitivity_scan_tfboard/hopper_set1_seed0",
-#     "sensitivity_scan_tfboard/hopper_set1_seed1",
-#     "sensitivity_scan_tfboard/hopper_set1_seed2",
-#     "sensitivity_scan_tfboard/hopper_set1_seed3",
-#     "sensitivity_scan_tfboard/hopper_set1_seed4",
+#     " tfboard/avatardice/hopper_set1_seed0",
+#     " tfboard/avatardice/wipe_set1_seed0",
+#     " tfboard/avatardice/ant_set1_seed0",
+#     " tfboard/avatardice/cheetah_set1_seed0",
+#     " tfboard/avatardice/door_set1_seed0",
+#     " tfboard/avatardice/lift_set1_seed0",
 # ]:
 #     # pass the directory to include all its event files
 #     ea = EventAccumulator(p)
@@ -33,11 +34,15 @@ def find_event_file(path: str) -> Path:
         return p
     if p.is_dir():
         # choose newest TensorBoard events file in directory
-        cands = sorted(p.glob("events.out.tfevents.*"),
-                       key=lambda x: x.stat().st_mtime, reverse=True)
+        cands = sorted(
+            p.glob("events.out.tfevents.*"),
+            key=lambda x: x.stat().st_mtime,
+            reverse=True,
+        )
         if not cands:
-            cands = sorted(p.glob("tfevents.*"),
-                           key=lambda x: x.stat().st_mtime, reverse=True)
+            cands = sorted(
+                p.glob("tfevents.*"), key=lambda x: x.stat().st_mtime, reverse=True
+            )
         if not cands:
             raise FileNotFoundError(f"No tfevents file found under: {p}")
         return cands[0]
@@ -50,7 +55,8 @@ def load_scalar(event_file: Path, tag: str):
     tags = ea.Tags().get("scalars", [])
     if tag not in tags:
         raise KeyError(
-            f"Tag '{tag}' not found in {event_file}.\nAvailable scalars: {tags}")
+            f"Tag '{tag}' not found in {event_file}.\nAvailable scalars: {tags}"
+        )
     scal = ea.Scalars(tag)
     steps = np.array([s.step for s in scal], dtype=np.int64)
     vals = np.array([s.value for s in scal], dtype=np.float64)
@@ -82,42 +88,63 @@ def align_by_common_steps(runs):
         stacked = np.stack([v[:min_len] for _, v in runs], axis=0)
         return xs, stacked, "index"
     # map each run to dict(step->value) and collect
-    stacked = np.stack([
-        np.array([dict(zip(st, v))[s] for s in common_steps], dtype=np.float64)
-        for st, v in runs
-    ], axis=0)
+    stacked = np.stack(
+        [
+            np.array([dict(zip(st, v))[s] for s in common_steps], dtype=np.float64)
+            for st, v in runs
+        ],
+        axis=0,
+    )
     return common_steps, stacked, "step"
 
 
 def main():
     ap = argparse.ArgumentParser(
-        description="Plot single mean line with across-seed deviation shading from 5 TensorBoard runs.")
-    ap.add_argument("paths", nargs="+",
-                    help="Paths to 5 run directories OR tfevents files (seed0..seed4).")
-    ap.add_argument("--tag", default="Test average return",
-                    help="Scalar tag to read.")
-    ap.add_argument("--title", default=None,
-                    help="Plot title (default: inferred from parent dir of first run).")
+        description=(
+            "Plot single mean line with across-seed deviation shading from 5"
+            " TensorBoard runs."
+        )
+    )
+    ap.add_argument(
+        "paths",
+        nargs="+",
+        help="Paths to 5 run directories OR tfevents files (seed0..seed4).",
+    )
+    ap.add_argument("--tag", default="Test average return", help="Scalar tag to read.")
+    ap.add_argument(
+        "--title",
+        default=None,
+        help="Plot title (default: inferred from parent dir of first run).",
+    )
     ap.add_argument("--xlabel", default="Steps", help="X-axis label.")
-    ap.add_argument("--ylabel", default="Test Average Return",
-                    help="Y-axis label.")
-    ap.add_argument("--out", default="tb_5seeds_mean_band.png",
-                    help="Output PNG path.")
-    ap.add_argument("--smooth", type=int, default=5,
-                    help="Uniform smoothing window for mean (>=1).")
-    ap.add_argument("--smooth-std", type=int, default=5,
-                    help="Uniform smoothing window for std band (>=1; 1 disables smoothing).")
-    ap.add_argument("--std-scale", type=float, default=0.5,
-                    help="Scale factor for std band (e.g., 0.5 for ±0.5σ).")
-    ap.add_argument("--alpha", type=float, default=0.20,
-                    help="Alpha for the shaded deviation band.")
-    ap.add_argument("--linewidth", type=float,
-                    default=3.5, help="Mean line width.")
+    ap.add_argument("--ylabel", default="Test Average Return", help="Y-axis label.")
+    ap.add_argument("--out", default="tb_5seeds_mean_band.png", help="Output PNG path.")
+    ap.add_argument(
+        "--smooth", type=int, default=5, help="Uniform smoothing window for mean (>=1)."
+    )
+    ap.add_argument(
+        "--smooth-std",
+        type=int,
+        default=5,
+        help="Uniform smoothing window for std band (>=1; 1 disables smoothing).",
+    )
+    ap.add_argument(
+        "--std-scale",
+        type=float,
+        default=0.5,
+        help="Scale factor for std band (e.g., 0.5 for ±0.5σ).",
+    )
+    ap.add_argument(
+        "--alpha", type=float, default=0.20, help="Alpha for the shaded deviation band."
+    )
+    ap.add_argument("--linewidth", type=float, default=3.5, help="Mean line width.")
     ap.add_argument("--markersize", type=float, default=6, help="Marker size.")
-    ap.add_argument("--markevery", type=int, default=10,
-                    help="Mark every N points.")
-    ap.add_argument("--color", default=None,
-                    help="Hex or name for the line/shade. Defaults to Matplotlib cycle.")
+    ap.add_argument("--markevery", type=int, default=10, help="Mark every N points.")
+    ap.add_argument(
+        "--color",
+        default=None,
+        help="Hex or name for the line/shade. Defaults to Matplotlib cycle.",
+    )
     args = ap.parse_args()
 
     if len(args.paths) < 2:
@@ -161,43 +188,49 @@ def main():
         std = uniform_filter1d(std, size=smooth_std_n)
 
     # figure style similar to your notebook aesthetic
-    plt.rcParams.update({
-        'axes.labelsize': 24,
-        'axes.titlesize': 24,
-        'xtick.labelsize': 18,
-        'ytick.labelsize': 18
-    })
+    plt.rcParams.update(
+        {
+            "axes.labelsize": 24,
+            "axes.titlesize": 24,
+            "xtick.labelsize": 18,
+            "ytick.labelsize": 18,
+        }
+    )
     fig, ax = plt.subplots(figsize=(10, 8))
 
     # choose color
     color = args.color
     if color is None:
         # let Matplotlib choose first cycle color
-        color = plt.rcParams['axes.prop_cycle'].by_key()['color'][0]
+        color = plt.rcParams["axes.prop_cycle"].by_key()["color"][0]
 
     # draw shading first so it appears behind the line
     band_low = mean - args.std_scale * std
     band_high = mean + args.std_scale * std
-    ax.fill_between(x, band_low, band_high,
-                    alpha=args.alpha, color=color, zorder=1)
+    ax.fill_between(x, band_low, band_high, alpha=args.alpha, color=color, zorder=1)
 
     # draw mean line
     ax.plot(
-        x, mean, label=args.title or Path(files[0]).parent.name,
-        marker='o', markersize=args.markersize, markevery=max(1, args.markevery),
-        linewidth=args.linewidth, color=color, zorder=2
+        x,
+        mean,
+        label=args.title or Path(files[0]).parent.name,
+        marker="o",
+        markersize=args.markersize,
+        markevery=max(1, args.markevery),
+        linewidth=args.linewidth,
+        color=color,
+        zorder=2,
     )
 
     ax.set_title(args.title or Path(files[0]).parent.name)
     ax.set_xlabel(args.xlabel + ("" if mode == "step" else " (index-aligned)"))
     ax.set_ylabel(args.ylabel)
-    ax.grid(visible=True, which="major",
-            color="lightgray", linestyle="--", linewidth=2)
+    ax.grid(visible=True, which="major", color="lightgray", linestyle="--", linewidth=2)
     ax.set_facecolor("white")
     for spine in ax.spines.values():
         spine.set_edgecolor("black")
         spine.set_linewidth(2.5)
-    ax.legend(loc='best', frameon=True)
+    ax.legend(loc="best", frameon=True)
 
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     fig.tight_layout()
