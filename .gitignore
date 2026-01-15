@@ -206,3 +206,4 @@ pretrained_models/
 runs/
 scripts/$*
 eval_videos/
+paper/
