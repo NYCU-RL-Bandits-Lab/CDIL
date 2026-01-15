@@ -196,6 +196,17 @@ def run(config):
     union_next_states = np.concatenate([imperfect_next_states, expert_next_states]).astype(np.float32)
     union_dones = np.concatenate([imperfect_dones, expert_dones]).astype(np.float32)
 
+    # =================================
+    perm_idx = np.random.permutation(len(union_states))
+    union_states = union_states[perm_idx]
+    union_actions = union_actions[perm_idx]
+    union_next_states = union_next_states[perm_idx]
+    union_dones = union_dones[perm_idx]
+
+    perm_init_idx = np.random.permutation(len(union_init_states))
+    union_init_states = union_init_states[perm_init_idx]
+    # ==================================
+
     print('# of expert demonstraions: {}'.format(expert_states.shape[0]))
     print('# of imperfect demonstraions: {}'.format(imperfect_states.shape[0]))
     # normalize
