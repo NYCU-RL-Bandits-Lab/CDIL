@@ -16,7 +16,7 @@
 """Wrapper to normalize gyn.spaces.Box actions in [-1, 1]."""
 
 from absl import logging
-import gymnasium as gym
+import gym
 from gymnasium import spaces
 import numpy as np
 

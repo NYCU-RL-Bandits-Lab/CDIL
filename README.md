@@ -13,7 +13,7 @@ The codebase is organized as follows:
 ## Requirements
 
 * **Python version**: Tested in Python 3.10.19
-* **Operating system**: Tested in Ubuntu 20.04
+* **Operating system**: Tested in Ubuntu 24.04
 * **PyTorch version**: 2.9.1
 
 Install other required packages:

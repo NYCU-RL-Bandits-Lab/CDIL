@@ -6,7 +6,7 @@ from torch import autograd
 from tqdm import tqdm 
 
 class Discriminator(nn.Module):
-    def __init__(self, input_dim, hidden_dim=256, device='cuda:0'):
+    def __init__(self, input_dim, hidden_dim=256, device='cuda'):
         super(Discriminator, self).__init__()
 
         self.device = device
@@ -179,6 +179,7 @@ class Discriminator_SA(nn.Module):
 
             self.optimizer.zero_grad()
             (gail_loss + grad_pen).backward()
+            torch.nn.utils.clip_grad_norm_(self.parameters(), 2.0)
             self.optimizer.step()
         return loss / n
 

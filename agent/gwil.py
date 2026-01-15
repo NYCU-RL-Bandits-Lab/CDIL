@@ -9,6 +9,8 @@ import copy
 
 import utils.utils as utils
 import abc
+import pickle
+import os
 
 
 class Agent(object):
@@ -136,6 +138,7 @@ class GWIL(Agent):
         # optimize the actor
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.actor.parameters(), max_norm=1.0)
         self.actor_optimizer.step()
 
         # self.actor.log(step)
@@ -165,3 +168,72 @@ class GWIL(Agent):
                                      self.critic_tau)
             
         return loss_result
+    
+    def get_training_state(self):
+        training_state = {
+            'critic_params': [(name, param.detach().cpu().numpy()) for name, param in self.critic.named_parameters()],
+            'critic_target_params': [(name, param.detach().cpu().numpy()) for name, param in self.critic_target.named_parameters()],
+            'actor_params': [(name, param.detach().cpu().numpy()) for name, param in self.actor.named_parameters()],
+            'log_alpha': self.log_alpha.detach().cpu().numpy(),
+            'critic_optimizer_state': self.critic_optimizer.state_dict(),
+            'actor_optimizer_state': self.actor_optimizer.state_dict(),
+            'log_alpha_optimizer_state': self.log_alpha_optimizer.state_dict(),
+        }
+        return training_state
+
+    def set_training_state(self, training_state):
+        self.critic.load_state_dict({name: torch.tensor(value, device=self.device) for name, value in training_state['critic_params']})
+        self.critic_target.load_state_dict({name: torch.tensor(value, device=self.device) for name, value in training_state['critic_target_params']})
+        self.actor.load_state_dict({name: torch.tensor(value, device=self.device) for name, value in training_state['actor_params']})
+        self.log_alpha.data = torch.tensor(training_state['log_alpha'], device=self.device, requires_grad=True)
+        self.critic_optimizer.load_state_dict(training_state['critic_optimizer_state'])
+        self.actor_optimizer.load_state_dict(training_state['actor_optimizer_state'])
+        self.log_alpha_optimizer.load_state_dict(training_state['log_alpha_optimizer_state'])
+
+    def init_dummy(self, state_dim, action_dim):
+        # Create a dummy replay buffer to match the update method's expected input
+        class DummyReplayBuffer:
+            def __init__(self) -> None:
+                self.device = "cuda"
+            def sample(self, batch_size, gw=False, normalize_reward=False, normalize_reward_batch=False, include_external_reward=False, weight_external_reward=1, weight_gw_reward=1):
+                obs = torch.zeros((batch_size, state_dim), dtype=torch.float32, device=self.device)
+                action = torch.zeros((batch_size, action_dim), dtype=torch.float32, device=self.device)
+                reward = torch.zeros((batch_size, 1), dtype=torch.float32, device=self.device)
+                next_obs = torch.zeros((batch_size, state_dim), dtype=torch.float32, device=self.device)
+                not_done = torch.ones((batch_size, 1), dtype=torch.float32, device=self.device)
+                not_done_no_max = torch.ones((batch_size, 1), dtype=torch.float32, device=self.device)
+                return obs, action, reward, next_obs, not_done, not_done_no_max
+
+        dummy_replay_buffer = DummyReplayBuffer()
+        self.update(dummy_replay_buffer, step=0)
+
+    def save(self, filepath, training_info):
+        print(f'Saving checkpoint to: {filepath}')
+        training_state = self.get_training_state()
+        data = {
+            'training_state': training_state,
+            'training_info': training_info,
+        }
+        try:
+            # Write to a temporary file first to avoid corruption
+            temp_filepath = filepath + '.tmp'
+            with open(temp_filepath, 'wb') as f:
+                pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
+            # Atomically rename the temporary file to the final filepath
+            os.replace(temp_filepath, filepath)
+            print(f'Successfully saved checkpoint to: {filepath}')
+        except Exception as e:
+            print(f'Error saving checkpoint to {filepath}: {str(e)}')
+            raise
+
+    def load(self, filepath):
+        print(f'Loading checkpoint from: {filepath}')
+        try:
+            with open(filepath, 'rb') as f:
+                data = pickle.load(f)
+            self.set_training_state(data['training_state'])
+            print(f'Successfully loaded checkpoint from: {filepath}')
+            return data
+        except Exception as e:
+            print(f'Error loading checkpoint from {filepath}: {str(e)}')
+            raise

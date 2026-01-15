@@ -16,7 +16,7 @@ class ReplayBuffer:
         state_dim: int,
         action_dim: int,
         buffer_size: int,
-        device: str = "cuda:0",
+        device: str = "cuda",
     ):
         self._buffer_size = buffer_size
         self._pointer = 0
@@ -135,28 +135,27 @@ def load_data_and_train_contras(
     Returns:
         tuple: (target_buffer, target_expert_buffer, source_buffer, source_expert_buffer, info, total_steps)
     """
-    # Load source expert and random datasets
-    xml_path = config['xml_path']
-    if xml_path:
-        (src_expert_initial_states, src_expert_states, src_expert_actions, 
-         src_expert_next_states, src_expert_dones) = utils.load_d4rl_data(
-            dataset_dir, env_id + '-v2', 'expert-v2', 400, start_idx=0)
-        (src_random_initial_states, src_random_states, src_random_actions, 
-         src_random_next_states, src_random_dones) = utils.load_d4rl_data(
-            dataset_dir, env_id + '-v2', 'random-v2', 1600, start_idx=0)
-    else:
-        src_dataset_path = os.path.join(dataset_dir, config['src_expert_path'])
-        (src_expert_initial_states, src_expert_states, src_expert_actions, 
-         src_expert_next_states, src_expert_dones) = utils.sample_demonstrations(
-            env_id=env_id, num_trajectories=400, load_path=src_dataset_path, 
-            max_episode_steps=500, difficulty='expert', dtype=np.float32, 
-            env_robot=config['src_env_robot'])
-        src_dataset_path = os.path.join(dataset_dir, config['src_random_path'])
-        (src_random_initial_states, src_random_states, src_random_actions, 
-         src_random_next_states, src_random_dones) = utils.sample_demonstrations(
-            env_id=env_id, num_trajectories=1600, load_path=src_dataset_path, 
-            max_episode_steps=500, difficulty='random', dtype=np.float32, 
-            env_robot=config['src_env_robot'])
+    # xml_path = config['xml_path']
+    # if xml_path:
+    (src_expert_initial_states, src_expert_states, src_expert_actions,
+        src_expert_next_states, src_expert_dones) = utils.load_d4rl_data(
+        dataset_dir, env_id + '-v2', 'expert-v2', 400, start_idx=0)
+    (src_random_initial_states, src_random_states, src_random_actions,
+        src_random_next_states, src_random_dones) = utils.load_d4rl_data(
+        dataset_dir, env_id + '-v2', 'random-v2', 1600, start_idx=0)
+    # else:
+        # src_dataset_path = os.path.join(dataset_dir, config['src_expert_path'])
+        # (src_expert_initial_states, src_expert_states, src_expert_actions,
+        #     src_expert_next_states, src_expert_dones) = utils.sample_demonstrations(
+        #     env_id=env_id, num_trajectories=400, load_path=src_dataset_path,
+        #     max_episode_steps=500, difficulty='expert', dtype=np.float32,
+        #     env_robot=config['src_env_robot'])
+        # src_dataset_path = os.path.join(dataset_dir, config['src_random_path'])
+        # (src_random_initial_states, src_random_states, src_random_actions,
+        #     src_random_next_states, src_random_dones) = utils.sample_demonstrations(
+        #     env_id=env_id, num_trajectories=1600, load_path=src_dataset_path,
+        #     max_episode_steps=500, difficulty='random', dtype=np.float32,
+        #     env_robot=config['src_env_robot'])
 
     # Concatenate source expert and random data
     src_union_states = np.concatenate([src_expert_states, src_random_states]).astype(np.float32)
@@ -285,7 +284,7 @@ class IQ_Learn:
         self,
         agent,
         discount: float = 0.99,
-        device: str = "cuda:0",
+        device: str = "cuda",
     ):
         self.agent = agent
         self.discount = discount

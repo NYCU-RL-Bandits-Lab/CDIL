@@ -140,6 +140,8 @@ class Critic(nn.Module):
         self.output_activation_fn = output_activation_fn
 
     def forward(self, x):
+        if x.dtype != self.fc_layers[0].weight.dtype:
+            x = x.to(dtype=self.fc_layers[0].weight.dtype)
         h = self.fc_layers(x)
         h = self.last_layer(h)
         if self.output_activation_fn is not None:

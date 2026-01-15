@@ -14,15 +14,19 @@
 # limitations under the License.
 
 """A collection of gym wrappers."""
-import gymnasium as gym
+import gym
 
-# import gym
-from wrappers.absorbing_wrapper import AbsorbingWrapper
-from wrappers.normalize_action_wrapper import check_and_normalize_box_actions
-from wrappers.normalize_state_wrapper import NormalizeStateWrapper
+from wrappers_gym.absorbing_wrapper import AbsorbingWrapper
+from wrappers_gym.normalize_action_wrapper import check_and_normalize_box_actions
+from wrappers_gym.normalize_state_wrapper import NormalizeStateWrapper
 import robosuite as suite
 from robosuite import load_controller_config
 from robosuite.wrappers import GymWrapper
+
+import sys
+sys.path.append("/home/seanma0627/src/off-dynamics-rl")
+from gymnasium import spaces
+from envs.mujoco.call_mujoco_env  import call_mujoco_env
 
 
 class GymToGymnasium(gym.Env):
@@ -86,26 +90,10 @@ def create_il_env(
     Returns:
         An initialized gym environment.
     """
-    if xml_path:
-        # env = gymnasium.make(env_name, xml_file=xml_path)
-        env = gym.make(env_name, xml_file=xml_path, render_mode='rgb_array')
-    elif robot:
-        controller_config = load_controller_config(default_controller="JOINT_VELOCITY")
-        env_suite = suite.make(
-            env_name,
-            robots=robot,
-            controller_configs=controller_config,
-            has_renderer=False,
-            has_offscreen_renderer=False,
-            use_object_obs=True,
-            use_camera_obs=False,
-            reward_shaping=True,
-            horizon=500,
-        )
-        keys = ["object-state"]
-        for idx in range(len(env_suite.robots)):
-            keys.append(f"robot{idx}_proprio-state")
-        env = GymWrapper(env_suite, keys=keys)
+    if 'hopper' in env_name.lower():
+        env = call_mujoco_env({'env_name':"hopper-gravity", 'shift_level': 2.0})
+    elif 'ant' in env_name.lower():
+        env = call_mujoco_env({'env_name':"ant-friction", 'shift_level': 0.1})
     else:
         env = gym.make(env_name)
     if normalized_box_actions:

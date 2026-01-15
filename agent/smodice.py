@@ -93,7 +93,7 @@ class SMODICE(object):
             })
 
         result.update({
-            # 'w_e': w_e,
+            'w_e': torch.mean(w_e),
             'policy_loss': policy_loss,
             'negative_entropy_loss': negative_entropy_loss
         })
@@ -125,6 +125,8 @@ class SMODICE(object):
         else:
             w_e = self._f_star_prime(e_v)
 
+        w_e = torch.clamp(w_e, min=1e-6, max=100.0)
+
         # policy learning (Equation 22 in the paper)
         loss_result = self.policy_loss(observation, action, w_e.detach(), result=loss_result)
 
@@ -134,6 +136,7 @@ class SMODICE(object):
 
         self._optimizers['policy'].zero_grad()
         loss_result['policy_loss'].backward()
+        torch.nn.utils.clip_grad_norm_(self._policy_network.parameters(), max_norm=1.0)
         self._optimizers['policy'].step()
 
         if self._use_policy_entropy_constraint:
