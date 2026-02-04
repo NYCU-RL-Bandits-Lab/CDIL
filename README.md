@@ -26,16 +26,15 @@ We evaluate on **6 cross-domain transfer tasks** spanning MuJoCo locomotion and 
 | **Ant** | 4-Legged Ant | 5-Legged Ant |
 | **HalfCheetah** | Standard Cheetah | Three-Leg Cheetah |
 
-<p align="center">
-  <img src="assets/env_hopper.png" width="180" alt="Hopper (Source)">
-  <img src="assets/env_three_thigh_hopper.png" width="180" alt="Hopper (Target)">
-  &nbsp;&nbsp;
-  <img src="assets/env_ant.png" width="180" alt="Ant (Source)">
-  <img src="assets/env_five_leg_ant.png" width="180" alt="Ant (Target)">
-</p>
-<p align="center">
-  <em>Left: Hopper source → target (three-thigh). Right: Ant source → target (five-leg).</em>
-</p>
+<table align="center">
+  <tr>
+    <td align="center"><img src="assets/env_hopper.png" width="180"><br><sub>Hopper (Source)</sub></td>
+    <td align="center"><img src="assets/env_three_thigh_hopper.png" width="180"><br><sub>Hopper (Target)</sub></td>
+    <td width="40"></td>
+    <td align="center"><img src="assets/env_ant.png" width="180"><br><sub>Ant (Source)</sub></td>
+    <td align="center"><img src="assets/env_five_leg_ant.png" width="180"><br><sub>Ant (Target)</sub></td>
+  </tr>
+</table>
 
 ### Robosuite Manipulation (Robot Transfer)
 
@@ -45,53 +44,50 @@ We evaluate on **6 cross-domain transfer tasks** spanning MuJoCo locomotion and 
 | **DoorOpening** | Panda Robot | UR5e Robot |
 | **TableWiping** | Panda Robot | UR5e Robot |
 
-<p align="center">
-  <img src="assets/env_lift_panda.png" width="200" alt="Lift (Panda)">
-  <img src="assets/env_lift_ur5e.png" width="200" alt="Lift (UR5e)">
-  &nbsp;&nbsp;
-  <img src="assets/env_door_panda.png" width="200" alt="Door (Panda)">
-  <img src="assets/env_door_ur5e.png" width="200" alt="Door (UR5e)">
-</p>
-<p align="center">
-  <em>Robot transfer from Franka Panda (source) to UR5e (target) for Lift and Door tasks.</em>
-</p>
+<table align="center">
+  <tr>
+    <td align="center"><img src="assets/env_lift_panda.png" width="200"><br><sub>Lift (Panda)</sub></td>
+    <td align="center"><img src="assets/env_lift_ur5e.png" width="200"><br><sub>Lift (UR5e)</sub></td>
+    <td width="40"></td>
+    <td align="center"><img src="assets/env_door_panda.png" width="200"><br><sub>Door (Panda)</sub></td>
+    <td align="center"><img src="assets/env_door_ur5e.png" width="200"><br><sub>Door (UR5e)</sub></td>
+  </tr>
+</table>
 
 ## Main Results
 
 AdaptDICE consistently outperforms baselines (SMODICE, GWIL, IGDF+IQ-Learn) across all environments:
 
-<p align="center">
-  <img src="assets/main_hopper_woexp.png" width="280" alt="Hopper">
-  <img src="assets/main_ant_woexp.png" width="280" alt="Ant">
-  <img src="assets/main_cheetah_woexp.png" width="280" alt="HalfCheetah">
-</p>
-<p align="center">
-  <img src="assets/main_lift_woexp.png" width="280" alt="Lift">
-  <img src="assets/main_door_woexp.png" width="280" alt="Door">
-  <img src="assets/main_wipe_woexp.png" width="280" alt="Wipe">
-</p>
-<p align="center">
-  <img src="assets/main_bar.png" width="400">
-</p>
-<p align="center">
-  <em>Training curves on MuJoCo (top) and Robosuite (bottom). AdaptDICE (green) achieves the highest returns.</em>
-</p>
+<table align="center">
+  <tr>
+    <td align="center"><img src="assets/main_hopper_woexp.png" width="280"><br><sub>Hopper</sub></td>
+    <td align="center"><img src="assets/main_ant_woexp.png" width="280"><br><sub>Ant</sub></td>
+    <td align="center"><img src="assets/main_cheetah_woexp.png" width="280"><br><sub>HalfCheetah</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/main_lift_woexp.png" width="280"><br><sub>Lift</sub></td>
+    <td align="center"><img src="assets/main_door_woexp.png" width="280"><br><sub>Door</sub></td>
+    <td align="center"><img src="assets/main_wipe_woexp.png" width="280"><br><sub>Wipe</sub></td>
+  </tr>
+  <tr>
+    <td colspan="3" align="center"><img src="assets/main_bar.png" width="400"><br><sub>Training curves on MuJoCo (top) and Robosuite (bottom). AdaptDICE (green) achieves the highest returns.</sub></td>
+  </tr>
+</table>
 
 ## Ablation Study
 
 Comparing AdaptDICE against Target-Only (w_tar) and Source-Only (w_src) variants:
 
-<p align="center">
-  <img src="assets/ablation_ant_woexp.png" width="280" alt="Ablation Ant">
-  <img src="assets/ablation_cheetah_woexp.png" width="280" alt="Ablation Cheetah">
-  <img src="assets/ablation_door_woexp.png" width="280" alt="Ablation Door">
-</p>
-<p align="center">
-  <img src="assets/ablation_bar.png" width="300">
-</p>
-<p align="center">
-  <em>AdaptDICE (blue) leverages both source and target knowledge, outperforming single-domain variants.</em>
-</p>
+<table align="center">
+  <tr>
+    <td align="center"><img src="assets/ablation_ant_woexp.png" width="280"><br><sub>Ant</sub></td>
+    <td align="center"><img src="assets/ablation_cheetah_woexp.png" width="280"><br><sub>HalfCheetah</sub></td>
+    <td align="center"><img src="assets/ablation_door_woexp.png" width="280"><br><sub>Door</sub></td>
+  </tr>
+  <tr>
+    <td colspan="3" align="center"><img src="assets/ablation_bar.png" width="300"><br><sub>AdaptDICE (blue) leverages both source and target knowledge, outperforming single-domain variants.</sub></td>
+  </tr>
+</table>
 
 ## Code Structure
 
