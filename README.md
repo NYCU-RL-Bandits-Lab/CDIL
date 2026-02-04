@@ -236,7 +236,7 @@ If you find this work useful, please cite:
   author={Anonymous},
   journal={Transactions on Machine Learning Research},
   year={2025},
-  note={Under review},
+  note={Accepted},
   url={https://openreview.net/forum?id=WARXnbJawZ}
 }
 ```
