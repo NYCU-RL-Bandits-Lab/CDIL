@@ -6,7 +6,9 @@
 
 **Semi-Supervised Cross-Domain Imitation Learning**
 
-*Under review at Transactions on Machine Learning Research (TMLR)*
+Li-Min Chu, Kai-Siang Ma, Ming-Hong Chen, and Ping-Chun Hsieh
+
+*Transactions on Machine Learning Research (TMLR), February 2026*
 
 [[Paper]](https://openreview.net/forum?id=WARXnbJawZ)
 
@@ -227,12 +229,11 @@ If you find this work useful, please cite:
 
 ```bibtex
 @article{
-  anonymous2025semisupervised,
+  chu2026semisupervised,
   title={Semi-Supervised Cross-Domain Imitation Learning},
-  author={Anonymous},
+  author={Li-Min Chu and Kai-Siang Ma and Ming-Hong Chen and Ping-Chun Hsieh},
   journal={Transactions on Machine Learning Research},
-  year={2025},
-  note={Accepted},
+  year={2026},
   url={https://openreview.net/forum?id=WARXnbJawZ}
 }
 ```
